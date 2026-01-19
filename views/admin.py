@@ -317,9 +317,12 @@ def render(db):
                     data.append(s)
                 
                 df = pd.DataFrame(data)
-                df = df.sort_values(by=['Pts', 'Games'], ascending=[False, False])
-                df = df.rename(columns={'name': '팀이름', 'W': '승', 'L': '패', 'D': '무', 'Pts': '승점', 'Games': '득실'})
-                st.dataframe(df[['팀이름', '승', '무', '패', '승점', '득실']], hide_index=True, use_container_width=True)
+                if not df.empty:
+                    df = df.sort_values(by=['Pts', 'Games'], ascending=[False, False])
+                    df = df.rename(columns={'name': '팀이름', 'W': '승', 'L': '패', 'D': '무', 'Pts': '승점', 'Games': '득실'})
+                    st.dataframe(df[['팀이름', '승', '무', '패', '승점', '득실']], hide_index=True, use_container_width=True)
+                else:
+                    st.info("팀 데이타가 없습니다.")
         
         # List view
         st.divider()
