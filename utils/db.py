@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import os
 import datetime
+import time
 from supabase import create_client, Client
 
 # For now, we use a simple class stored in st.cache_resource to simulate a shared DB.
@@ -21,16 +22,32 @@ class SupabaseDatabase:
             st.error(f"Supabase Connection Failed: {e}")
             self.client = None
 
+    def _retry(self, func, retries=3, delay=0.5):
+        """Simple retry wrapper for network operations"""
+        last_exception = None
+        for i in range(retries):
+            try:
+                return func()
+            except Exception as e:
+                last_exception = e
+                time.sleep(delay * (i + 1)) # linear backoff
+        # If we get here, it failed all retries
+        st.warning(f"Database connection unstable. Retrying... ({last_exception})")
+        return None
+
     def load_config(self):
         if not self.client: return {"num_teams": 32, "num_groups": 8, "num_courts": 6}
         try:
-            res = self.client.table('tournament_config').select('*').eq('key', 'main_config').execute()
-            if res.data:
+            # Wrap execution in lambda for retry
+            res = self._retry(lambda: self.client.table('tournament_config').select('*').eq('key', 'main_config').execute())
+            if res and res.data:
                 return res.data[0]['value']
             else:
                 # Default
                 default_conf = {"num_teams": 32, "num_groups": 8, "num_courts": 6}
-                self.client.table('tournament_config').insert({'key': 'main_config', 'value': default_conf}).execute()
+                # Init might fail too, but less critical to retry loop here if load failed? 
+                # Let's just try insert once.
+                self._retry(lambda: self.client.table('tournament_config').insert({'key': 'main_config', 'value': default_conf}).execute())
                 return default_conf
         except:
             return {"num_teams": 32, "num_groups": 8, "num_courts": 6}
@@ -45,14 +62,17 @@ class SupabaseDatabase:
         # Fetch knockout state
         if not self.client: return {'is_active': False}
         try:
-            res = self.client.table('tournament_config').select('*').eq('key', 'knockout_draw').execute()
-            if res.data:
+            res = self._retry(lambda: self.client.table('tournament_config').select('*').eq('key', 'knockout_draw').execute())
+            if res and res.data:
                 return res.data[0]['value']
             return {
                 "is_active": False,
                 "current_round_name": "16강",
-                "pot_1": [], "pot_2": [], "matches": [], 
-                "current_drawer_idx": 0, "round_history": []
+                "pot_1": [], 
+                "pot_2": [], 
+                "matches": [], 
+                "current_drawer_idx": 0,
+                "round_history": []
             }
         except:
             return {}
@@ -60,7 +80,7 @@ class SupabaseDatabase:
     @knockout_draw.setter
     def knockout_draw(self, value):
         if not self.client: return
-        self.client.table('tournament_config').upsert({'key': 'knockout_draw', 'value': value}).execute()
+        self._retry(lambda: self.client.table('tournament_config').upsert({'key': 'knockout_draw', 'value': value}).execute())
 
     def save_to_disk(self):
         # Compatibility method: No-op for Supabase or maybe trigger config save?
@@ -68,12 +88,15 @@ class SupabaseDatabase:
         # But some code assumes modifying `db.config` locally then calling `save_to_disk`.
         # So we should save config here.
         if self.client:
-            self.client.table('tournament_config').upsert({'key': 'main_config', 'value': self.config}).execute()
+            self._retry(lambda: self.client.table('tournament_config').upsert({'key': 'main_config', 'value': self.config}).execute())
 
     # --- Teams ---
     def get_teams(self):
         if not self.client: return []
-        res = self.client.table('teams').select('*').execute()
+        res = self._retry(lambda: self.client.table('teams').select('*').execute())
+        
+        if not res: return [] # Failed
+        
         # Sort by ID numeric if possible or just alpha
         # ID is "t1", "t2".
         data = res.data
@@ -99,7 +122,7 @@ class SupabaseDatabase:
         if current:
             ids = [t['id'] for t in current]
             # Chunk delete if many
-            self.client.table('teams').delete().in_('id', ids).execute()
+            self._retry(lambda: self.client.table('teams').delete().in_('id', ids).execute())
         
         new_teams = []
         for i, item in enumerate(teams_data):
@@ -131,7 +154,7 @@ class SupabaseDatabase:
             new_teams.append(t_row)
             
         if new_teams:
-            self.client.table('teams').insert(new_teams).execute()
+            self._retry(lambda: self.client.table('teams').insert(new_teams).execute())
         
         # Sync local config if needed? No, separate call.
         return new_teams
@@ -176,12 +199,15 @@ class SupabaseDatabase:
             
             # Update these teams
             for tid in tids:
-                 self.client.table('teams').update({"group_id": gid}).eq('id', tid).execute()
+                 self._retry(lambda: self.client.table('teams').update({"group_id": gid}).eq('id', tid).execute())
 
     # --- Matches ---
     def get_matches(self):
         if not self.client: return []
-        res = self.client.table('matches').select('*').execute()
+        res = self._retry(lambda: self.client.table('matches').select('*').execute())
+        
+        if not res: return []
+
         # Data conversion: Convert strings back to types if needed.
         # JSON standard types work fine.
         data = res.data
@@ -198,7 +224,7 @@ class SupabaseDatabase:
         if current:
             ids = [m['id'] for m in current]
             # Delete in chunks if needed (Supabase limit usually high enough for ~100)
-            self.client.table('matches').delete().in_('id', ids).execute()
+            self._retry(lambda: self.client.table('matches').delete().in_('id', ids).execute())
         
         if matches:
             # Clean data for SQL
@@ -234,7 +260,7 @@ class SupabaseDatabase:
             chunk_size = 100
             for i in range(0, count, chunk_size):
                 chunk = clean_matches[i:i+chunk_size]
-                self.client.table('matches').insert(chunk).execute()
+                self._retry(lambda: self.client.table('matches').insert(chunk).execute())
 
     def update_match(self, match_id, updates):
         if not self.client: return
@@ -242,7 +268,7 @@ class SupabaseDatabase:
         # Sanitize
         if 'group_id' in updates: updates['group_id'] = str(updates['group_id'])
         
-        self.client.table('matches').update(updates).eq('id', match_id).execute()
+        self._retry(lambda: self.client.table('matches').update(updates).eq('id', match_id).execute())
         
         # If 'status' COMPLETED, update court? Handled by logic usually.
         # Return updated logic locally?
@@ -255,18 +281,18 @@ class SupabaseDatabase:
     # --- Courts ---
     def get_courts(self):
         if not self.client: return []
-        res = self.client.table('courts').select('*').order('id').execute()
-        if not res.data:
+        res = self._retry(lambda: self.client.table('courts').select('*').order('id').execute())
+        if not res or not res.data:
             # Init if empty
             n = self.config.get('num_courts', 6)
             init_data = [{"id": i+1, "match_id": None} for i in range(n)]
-            self.client.table('courts').insert(init_data).execute()
+            self._retry(lambda: self.client.table('courts').insert(init_data).execute())
             return init_data
         return res.data
 
     def update_court(self, court_id, match_id):
         if not self.client: return
-        self.client.table('courts').update({'match_id': match_id}).eq('id', court_id).execute()
+        self._retry(lambda: self.client.table('courts').update({'match_id': match_id}).eq('id', court_id).execute())
 
     # --- Compatibility Wrapper ---
     @property
@@ -283,6 +309,7 @@ class SupabaseDatabase:
     def matches(self): 
         # Convert group_id back to int if numeric string (compatibility)
         data = self.get_matches()
+        if not data: return []
         for m in data:
             if m['group_id'].isdigit():
                 m['group_id'] = int(m['group_id'])
@@ -300,8 +327,8 @@ class SupabaseDatabase:
         # But if `db.courts = ...` is called, we should respect it.
         # Likely from admin config change.
         if not self.client: return
-        self.client.table('courts').delete().neq('id', 0).execute() 
-        self.client.table('courts').insert(val).execute()
+        self._retry(lambda: self.client.table('courts').delete().neq('id', 0).execute()) 
+        self._retry(lambda: self.client.table('courts').insert(val).execute())
 
 
 @st.cache_resource
