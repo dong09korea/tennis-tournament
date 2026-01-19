@@ -104,20 +104,30 @@ class SupabaseDatabase:
         new_teams = []
         for i, item in enumerate(teams_data):
             tid = f"t{i+1}"
-            t_row = {
-                "id": tid,
-                "name": item.get('name', f'Team {i+1}'),
-                "player1": item.get('player1', ''),
-                "player2": item.get('player2', ''),
-                "group_id": None, # Handle later
-                "stats": {"wins": 0, "draws": 0, "losses": 0, "points": 0, "games_won": 0}
-            }
-            # Check pre-group
-            if item.get('group'):
-                try:
-                    t_row['group_id'] = int(item['group'])
-                except:
-                    pass
+            if isinstance(item, str):
+                t_row = {
+                    "id": tid,
+                    "name": item,
+                    "player1": "",
+                    "player2": "",
+                    "group_id": None, 
+                    "stats": {"wins": 0, "draws": 0, "losses": 0, "points": 0, "games_won": 0}
+                }
+            else:
+                t_row = {
+                    "id": tid,
+                    "name": item.get('name', f'Team {i+1}'),
+                    "player1": item.get('player1', ''),
+                    "player2": item.get('player2', ''),
+                    "group_id": None, # Handle later
+                    "stats": {"wins": 0, "draws": 0, "losses": 0, "points": 0, "games_won": 0}
+                }
+                # Check pre-group
+                if item.get('group'):
+                    try:
+                        t_row['group_id'] = int(item['group'])
+                    except:
+                        pass
             new_teams.append(t_row)
             
         if new_teams:
