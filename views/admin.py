@@ -330,17 +330,16 @@ def render(db):
                             tb_label = " <span style='color:orange;'>(TIE BREAK)</span>"
 
                         # Custom HTML for centered and better layout
-                        st.markdown(f"""
                             <div style="text-align: center;">
-                                <div style="font-size: 0.9em; color: gray; margin-bottom: 5px;">
+                                <div style="font-size: 0.9em; color: #ccc; margin-bottom: 5px;">
                                     {match['group_id']}조 {match['round']}경기{tb_label}
                                 </div>
                                 <div style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 10px;">
-                                    <div style="font-size: 1.2em; font-weight: bold; width: 45%; text-align: right; color: #000000;">{nA}</div>
-                                    <div style="font-size: 0.9em; color: #444;">vs</div>
-                                    <div style="font-size: 1.2em; font-weight: bold; width: 45%; text-align: left; color: #000000;">{nB}</div>
+                                    <div style="font-size: 1.2em; font-weight: bold; width: 45%; text-align: right; color: #ffffff;">{nA}</div>
+                                    <div style="font-size: 0.9em; color: #aaa;">vs</div>
+                                    <div style="font-size: 1.2em; font-weight: bold; width: 45%; text-align: left; color: #ffffff;">{nB}</div>
                                 </div>
-                                <div style="font-size: 2.2em; font-weight: bold; color: #006400; margin-bottom: 5px;">
+                                <div style="font-size: 2.2em; font-weight: bold; color: #ccff00; margin-bottom: 5px;">
                                     {match['score_a']} : {match['score_b']}
                                 </div>
                         """, unsafe_allow_html=True)
@@ -354,7 +353,7 @@ def render(db):
                             pb = pts_map[match['point_b']]
                             
                         st.markdown(f"""
-                                <div style="font-size: 1.0em; color: #333;">
+                                <div style="font-size: 1.0em; color: #ddd;">
                                     Points: {pa} - {pb}
                                 </div>
                                 <div style="margin-top: 10px; color: #FF4B4B; font-weight: bold;">
