@@ -70,7 +70,7 @@ if 'intro_accepted' not in st.session_state:
             <div class="fbi-title">WARNING</div>
             <div class="fbi-subtitle">FBI ANTI-PIRACY WARNING</div>
             <div class="fbi-text">
-                <strong>본 프로그램은 "라켓업 홍보이사 김동현" 님에 의해 제작되었습니다.</strong><br>
+                본 프로그램은 <strong style="font-size: 1.5em; color: #ccff00; text-decoration: underline;">"라켓업 홍보이사 김동현"</strong> 님에 의해 제작되었습니다.<br>
                 <br>
                 저작권법 제501조 및 국제 형사법에 의거하여<br>
                 이 소프트웨어의 무단 복제, 배포, 방송 및 상업적 이용을 <strong>엄격히 금지</strong>합니다.<br>
