@@ -58,12 +58,20 @@ def render(db):
             
             current_start_time = parse_time(db.config.get("start_time", "09:00"))
             new_start_time = st.time_input("대회 시작 시간", value=current_start_time)
+            
+            # Notice/Schedule Editor
+            default_notice = """**진행 순서:**
+1. **예선 조별 리그** (각 조 풀리그, 5:5 무승부)
+2. **본선 토너먼트** (각 조 상위 팀 진출, 16강 ~ 결승)
+3. **시상식 (우승, 준우승, 3위)**"""
+            new_notice = st.text_area("대회 공지사항/일정 (메인 화면 표시)", value=db.config.get("notice", default_notice), height=150)
                 
             if st.form_submit_button("설정 적용 (새로고침)"):
                 db.config["num_teams"] = new_n_teams
                 db.config["num_groups"] = new_n_groups
                 db.config["num_courts"] = new_n_courts
                 db.config["start_time"] = new_start_time.strftime("%H:%M")
+                db.config["notice"] = new_notice
                 
                 # Re-init courts if needed
                 db.courts = [{"id": i+1, "match_id": None} for i in range(new_n_courts)]
