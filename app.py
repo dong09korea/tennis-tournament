@@ -153,23 +153,46 @@ else:
     # Fetch start time
     start_time_str = db.config.get("start_time", "09:00")
     
-    notice_content = db.config.get('notice', '''**진행 순서:**
-1. **예선 조별 리그** (각 조 풀리그, 5:5 무승부)
-2. **본선 토너먼트** (각 조 상위 팀 진출, 16강 ~ 결승)
-3. **시상식 (우승, 준우승, 3위)**''')
-
+    # Hardcoded Wimbledon Style Timetable
     st.markdown(f"""
 <div style="background-color: #006030; color: #ffffff; padding: 25px; border-radius: 12px; border-left: 10px solid #5c2d91; box-shadow: 0 4px 6px rgba(0,0,0,0.3); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;">
-<div style="border-bottom: 2px solid #5c2d91; padding-bottom: 10px; margin-bottom: 15px; display: flex; align-items: center;">
-<span style="font-size: 1.5em; margin-right: 10px;">🎾</span>
-<span style="font-size: 1.3em; font-weight: bold; color: #ccff00;">OFFICIAL SCHEDULE</span>
+<div style="border-bottom: 2px solid #5c2d91; padding-bottom: 10px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between;">
+    <div style="display: flex; align-items: center;">
+        <span style="font-size: 1.5em; margin-right: 10px;">🎾</span>
+        <span style="font-size: 1.3em; font-weight: bold; color: #ccff00;">OFFICIAL SCHEDULE</span>
+    </div>
+    <div style="background-color: #5c2d91; color: #fff; padding: 5px 10px; border-radius: 5px; font-weight: bold; font-size: 0.9em;">
+        START: {start_time_str}
+    </div>
 </div>
-<div style="font-size: 1.1em; margin-bottom: 20px;">
-<span style="color: #aaa;">START TIME:</span> 
-<span style="font-weight: bold; color: #fff; font-size: 1.2em; margin-left: 5px;">{start_time_str}</span>
+
+<div style="display: grid; grid-template-columns: 80px 1fr; gap: 10px; align-items: center;">
+    <!-- Row 1 -->
+    <div style="text-align: right; font-weight: bold; color: #ccff00; padding-right: 10px; border-right: 2px solid #5c2d91;">09:00</div>
+    <div style="background-color: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 5px;">🏟️ 개회식 및 오리엔테이션</div>
+
+    <!-- Row 2 -->
+    <div style="text-align: right; font-weight: bold; color: #ccff00; padding-right: 10px; border-right: 2px solid #5c2d91;">09:30</div>
+    <div style="background-color: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 5px;">🔥 예선 조별 리그 (Group Stage)</div>
+
+    <!-- Row 3 -->
+    <div style="text-align: right; font-weight: bold; color: #ccff00; padding-right: 10px; border-right: 2px solid #5c2d91;">12:00</div>
+    <div style="background-color: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 5px;">🥪 점심 식사 (Lunch Break)</div>
+
+    <!-- Row 4 -->
+    <div style="text-align: right; font-weight: bold; color: #ccff00; padding-right: 10px; border-right: 2px solid #5c2d91;">13:00</div>
+    <div style="background-color: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 5px;">🎾 예선 재개 및 순위 결정</div>
+
+    <!-- Row 5 -->
+    <div style="text-align: right; font-weight: bold; color: #ccff00; padding-right: 10px; border-right: 2px solid #5c2d91;">15:00</div>
+    <div style="background-color: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 5px;">🏆 본선 토너먼트 (Knockout Stage)</div>
+
+    <!-- Row 6 -->
+    <div style="text-align: right; font-weight: bold; color: #ccff00; padding-right: 10px; border-right: 2px solid #5c2d91;">17:00</div>
+    <div style="background-color: rgba(255,255,255,0.1); padding: 8px 12px; border-radius: 5px;">🥇 결승전 및 시상식 (Awards)</div>
 </div>
-<div style="background-color: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; white-space: pre-wrap; font-size: 1.05em; line-height: 1.6; color: #eeeeee;">
-{notice_content}
+<div style="margin-top: 15px; font-size: 0.85em; color: #aaa; text-align: center;">
+    * 경기 상황에 따라 시간이 변동될 수 있습니다.
 </div>
 </div>
 """, unsafe_allow_html=True)
