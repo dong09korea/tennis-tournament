@@ -148,7 +148,12 @@ else:
     st.title("🎾 라켓업 테니스대회")
     
     # Tournament Schedule & Order Section
-    st.markdown("### 📅 대회 일정 및 순서")
+    st.markdown("### 📅 대회 안내")
+
+    # Tournament Overview & Rules (Wimbledon Style)
+    st.markdown(f"""<div style="background-color: #006030; color: #ffffff; padding: 25px; border-radius: 12px; border-left: 10px solid #5c2d91; box-shadow: 0 4px 6px rgba(0,0,0,0.3); font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; margin-bottom: 20px;"><div style="border-bottom: 2px solid #5c2d91; padding-bottom: 10px; margin-bottom: 20px; display: flex; align-items: center;"><span style="font-size: 1.5em; margin-right: 10px;">📜</span><span style="font-size: 1.3em; font-weight: bold; color: #ccff00;">TOURNAMENT OVERVIEW</span></div><div style="background-color: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px; margin-bottom: 20px;"><h4 style="color: #ccff00; margin-top: 0; margin-bottom: 10px;">1. 대회 개요</h4><ul style="list-style-type: none; padding-left: 0; line-height: 1.6; color: #eeeeee;"><li style="margin-bottom: 5px;">• <strong>총 참가 인원:</strong> 96명 (48팀)</li><li style="margin-bottom: 5px;">• <strong>조 편성:</strong> 12개 조 (조별 예선 진행)</li><li style="margin-bottom: 5px;">• <strong>본선 진출(32강) 조건:</strong><br>&nbsp;&nbsp;- 각 조 1위 및 2위 (총 24팀 직행)<br>&nbsp;&nbsp;- 각 조 3위 팀 중 승패 및 득실차 상위 8팀 추가 진출</li></ul></div><div style="background-color: rgba(0,0,0,0.2); padding: 15px; border-radius: 8px;"><h4 style="color: #ccff00; margin-top: 0; margin-bottom: 10px;">2. 경기 규칙 및 심판 규정</h4><ul style="list-style-type: none; padding-left: 0; line-height: 1.6; color: #eeeeee;"><li style="margin-bottom: 5px;">• <strong>심판 미배치:</strong> 본 대회는 심판 없이 선수들이 직접 판정하는 '셀프 저지' 방식으로 진행됩니다.</li><li style="margin-bottom: 5px;">• <strong>판정 권한:</strong> 인/아웃 및 스코어 호칭은 <strong>리시버(Receiver)</strong>가 결정하고 콜하는 것을 원칙으로 합니다.</li><li style="margin-bottom: 5px;">• <strong>타이브레이크 규정:</strong><br>&nbsp;&nbsp;- 예선전: 타이브레이크 없음<br>&nbsp;&nbsp;- 본선(32강~): 타이브레이크 진행<br>&nbsp;&nbsp;- <strong>세부 규칙:</strong> 7점 선승제로 진행하며, 7점 이후 접전 시 <strong>최대 10점(맥시멈)</strong>에서 경기를 종료합니다.</li></ul></div></div>""", unsafe_allow_html=True)
+    
+    st.markdown("### 📅 대회 일정")
     
     # Fetch start time
     start_time_str = db.config.get("start_time", "09:00")
