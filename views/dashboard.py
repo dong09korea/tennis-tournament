@@ -25,6 +25,59 @@ def render(db):
                  return f"{name}\n({p1}, {p2})"
         return name
 
+    # --- NEW: Priority View (Hot & Next) ---
+    st.divider()
+    hot_matches = logic.get_closing_matches(db)
+    pending_matches = logic.get_pending_matches(db, limit=5)
+    
+    # Only show if there is something interesting
+    if hot_matches or pending_matches:
+        st.subheader("🔥 경기 종료 임박 & 대기 현황")
+        p_col1, p_col2 = st.columns([1.2, 1])
+        
+        with p_col1:
+            st.markdown("##### 🚨 곧 끝나는 코트 (준비해주세요!)")
+            if hot_matches:
+                for m in hot_matches:
+                    court_info = "미정"
+                    # Find court
+                    courts = db.get_courts()
+                    for c in courts:
+                         if c['match_id'] == m['id']:
+                             court_info = f"{c['id']}번 코트"
+                             break
+                    
+                    with st.container(border=True):
+                         h_cols = st.columns([0.8, 2, 1])
+                         with h_cols[0]:
+                             st.error(court_info, icon="🏟️")
+                         with h_cols[1]:
+                             tA = next(t for t in db.get_teams() if t['id'] == m['team_a_id'])['name']
+                             tB = next(t for t in db.get_teams() if t['id'] == m['team_b_id'])['name']
+                             st.write(f"**{tA}** vs **{tB}**")
+                         with h_cols[2]:
+                             st.write(f"**{m['score_a']} : {m['score_b']}**")
+                             if m.get('is_tie_break'): st.caption("TIE")
+            else:
+                st.info("현재 종료 임박한 경기가 없습니다.")
+
+        with p_col2:
+            st.markdown("##### ⏳ 다음 대기 경기 (Top 5)")
+            if pending_matches:
+                p_list = []
+                for m in pending_matches:
+                    tA = next(t for t in db.get_teams() if t['id'] == m['team_a_id'])['name']
+                    tB = next(t for t in db.get_teams() if t['id'] == m['team_b_id'])['name']
+                    p_list.append({
+                        "경기": f"{m['group_id']}조 {m['round']}R",
+                        "대진": f"{tA} vs {tB}"
+                    })
+                st.dataframe(pd.DataFrame(p_list), hide_index=True, use_container_width=True)
+            else:
+                st.caption("대기 중인 경기가 없습니다.")
+                
+    st.divider()
+
     # Tabs
     tab_courts, tab_standings, tab_bracket = st.tabs(["🏟️ 실시간 코트", "🏆 조별 순위", "🧬 대진표"])
 

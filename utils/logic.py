@@ -403,6 +403,70 @@ def calculate_standings(db):
             
     return stats
 
+def get_closing_matches(db):
+    """
+    Returns a list of matches that are close to finishing.
+    Criteria:
+    - Status is LIVE
+    - Sum of scores >= 7 (e.g. 4:3)
+    - Or one team has 5 points (Match point soon)
+    - Or is_tie_break is True
+    """
+    matches = db.get_matches()
+    live_matches = [m for m in matches if m['status'] == 'LIVE']
+    
+    closing = []
+    for m in live_matches:
+        sa = m['score_a']
+        sb = m['score_b']
+        is_tb = m.get('is_tie_break', False)
+        
+        # Priority Score (Higher is more urgent)
+        urgency = 0
+        if is_tb:
+            urgency = 100
+        elif sa == 5 or sb == 5:
+            urgency = 90
+        elif (sa + sb) >= 7:
+            urgency = 80 + (sa + sb)
+        
+        if urgency > 0:
+            m['_urgency'] = urgency # Temp attribute for sorting
+            closing.append(m)
+            
+    # Sort by urgency desc
+    closing.sort(key=lambda x: x['_urgency'], reverse=True)
+    return closing[:3]
+
+def get_pending_matches(db, limit=5):
+    """Returns next pending matches based on order (ID or Round)"""
+    matches = db.get_matches()
+    # Filter PENDING
+    pending = [m for m in matches if m['status'] == 'PENDING']
+    
+    # Sort logic: Low Round first, then Low ID
+    # Assuming match IDs are somewhat chronological or groups sorted.
+    # Ideally should sort by Round -> ID
+    # Note: ID is string, may need alphanumeric sort.
+    # But usually user wants to see what's next regardless of group.
+    
+    # Helper for int ID
+    def sort_key(m):
+        try:
+             # numeric part of id? 'm1' -> 1
+             # If ID is UUID, this fails. But we use 'm1', 'm2'... in generator?
+             # Actually generator uses uuid in some versions, but local db V2 used idx.
+             # Let's check db sample. 
+             # If logic.generate_schedule does NOT set ID, they might be random?
+             # Assuming purely random, round is best bet.
+             # If IDs are '1_1' (group_round)?
+             return (m['round'], m['id'])
+        except:
+             return (99, 99)
+
+    pending.sort(key=lambda x: (x.get('round', 99), len(x.get('id','')), x.get('id','')))
+    return pending[:limit]
+
 def init_knockout_draw(db):
     stats = calculate_standings(db)
     groups = db.get_groups()
