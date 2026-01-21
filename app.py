@@ -102,12 +102,17 @@ if 'intro_accepted' not in st.session_state:
         </div>
     """, unsafe_allow_html=True)
     
-    # 3 Seconds Delay simulation
+    # 3 Seconds Delay simulation (Run ONLY ONCE)
     placeholder = st.empty()
-    with placeholder:
-        for i in range(3, 0, -1):
-            st.write(f"⚠️ {i}초 후 입장 가능합니다...")
-            time.sleep(1)
+    
+    if 'intro_waited' not in st.session_state:
+        with placeholder:
+            for i in range(3, 0, -1):
+                st.write(f"⚠️ {i}초 후 입장 가능합니다...")
+                time.sleep(1)
+        st.session_state['intro_waited'] = True
+        st.rerun() # Rerun to show the button immediately
+    
     placeholder.empty()
     
     c1, c2, c3 = st.columns([1,2,1])
