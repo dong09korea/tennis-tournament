@@ -524,10 +524,28 @@ def render(db):
                 with c_conf3:
                     new_n_courts = st.number_input("코트 수", min_value=1, max_value=20, value=db.config.get("num_courts", 6))
                 
+                # Start Time & Notice
+                def parse_time(t_str):
+                    try:
+                        return datetime.datetime.strptime(t_str, "%H:%M").time()
+                    except:
+                        return datetime.time(9, 0)
+                
+                current_start_time = parse_time(db.config.get("start_time", "09:00"))
+                new_start_time = st.time_input("대회 시작 시간", value=current_start_time)
+                
+                default_notice = """**진행 순서:**
+1. **예선 조별 리그** (각 조 풀리그, 5:5 무승부)
+2. **본선 토너먼트** (각 조 상위 팀 진출, 16강 ~ 결승)
+3. **시상식 (우승, 준우승, 3위)**"""
+                new_notice = st.text_area("대회 공지사항/일정 (메인 화면 표시)", value=db.config.get("notice", default_notice), height=150)
+                
                 if st.form_submit_button("설정 저장"):
                     db.config["num_teams"] = new_n_teams
                     db.config["num_groups"] = new_n_groups
                     db.config["num_courts"] = new_n_courts
+                    db.config["start_time"] = new_start_time.strftime("%H:%M")
+                    db.config["notice"] = new_notice
                     
                     # Re-init courts if count changed
                     if len(db.courts) != new_n_courts:
@@ -574,7 +592,7 @@ def render(db):
             st.info("관람객 및 선수가 스마트폰으로 접속할 수 있는 통합 QR 코드를 생성합니다.")
             
             # Try to guess IP or let user input. 
-            default_url = "https://irmgard-unshowering-casen.ngrok-free.dev" 
+            default_url = "https://irmgard-unshowering-casen.ngrok-free.app" 
             base_url = st.text_input("현재 대회 서버 주소 (터미널의 Network URL을 입력하세요)", value=default_url, key="qr_url_force_new")
             
             if base_url:
