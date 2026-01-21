@@ -123,12 +123,27 @@ elif view_mode == "player":
 else:
     # Landing Page
     st.title("🎾 라켓업 테니스대회")
-    st.caption("원하시는 서비스를 선택하세요")
+    
+    # Tournament Schedule & Order Section
+    st.markdown("### 📅 대회 일정 및 순서")
+    
+    # Fetch start time
+    start_time_str = db.config.get("start_time", "09:00")
+    
+    st.info(f"""
+    **대회 시작 시간:** {start_time_str}
+    
+    **진행 순서:**
+    1. **예선 조별 리그** (각 조 풀리그, 5:5 무승부)
+    2. **본선 토너먼트** (각 조 상위 팀 진출, 16강 ~ 결승)
+    3. **시상식 (우승, 준우승, 3위)**
+    """)
     
     st.markdown("---")
+    st.caption("원하시는 서비스를 선택하세요")
     
     # Public Section (Mobile First)
-    if st.button("📊 관람용 대시보드 (실시간 현황)", use_container_width=True):
+    if st.button("📊 참가자용 대시보드 (전체 현황)", use_container_width=True, type="primary"):
         st.query_params["view"] = "dashboard"
         st.rerun()
         
@@ -141,14 +156,22 @@ else:
     st.markdown("---")
     
     # Admin / Staff Section (Collapsible or Bottom)
-    with st.expander("운영진 및 코트 접속 (Staff Only)"):
+    with st.expander("🔐 운영진 및 코트 접속 (Staff Only)"):
         c1, c2 = st.columns(2)
         with c1:
             if st.button("운영진 대시보드 입장", use_container_width=True):
                 st.query_params["view"] = "admin"
                 st.rerun()
         with c2:
-            st.write("코트 태블릿 접속")
+            # Court Login Input
+            court_pw = st.text_input("코트 비밀번호", type="password", key="idx_court_pw")
+            if st.button("코트 접속", use_container_width=True):
+                if auth.check_password('court', court_pw):
+                     st.warning("코트 접속은 각 코트별 고유 주소(QR)를 이용해주세요.")
+                     pass
+            
+            st.divider()
+            st.caption("테스트용 코트 바로가기")
             cols = st.columns(3)
             courts = db.get_courts()
             for i in range(len(courts)):
