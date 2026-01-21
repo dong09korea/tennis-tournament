@@ -164,13 +164,12 @@ def assign_matches_to_courts(db):
             # Assign
             pending_matches.pop(candidate_idx) # Remove from local list so we don't pick it again for next court loop
             
-            candidate_match['status'] = 'LIVE'
-            candidate_match['court_id'] = court['id']
-            
+            # Update Match Object
             db.update_match(candidate_match['id'], {
                 "status": "LIVE",
                 "court_id": court['id']
             })
+            # Update Court Object
             db.update_court(court['id'], candidate_match['id'])
             
             # Mark teams as busy for this iteration
@@ -469,11 +468,23 @@ def get_closing_matches(db):
 def get_pending_matches(db, limit=5):
     """Returns next pending matches based on order (ID or Round)"""
     matches = db.get_matches()
-    # Filter only truly PENDING matches (not assigned to any court, not in progress)
-    # The 'status' field should be 'PENDING', but defensive coding: also check court_id is None
+    
+    # Get set of currently active match IDs from courts to be safe
+    active_match_ids = set()
+    courts = db.get_courts()
+    for c in courts:
+        if c.get('match_id'):
+            active_match_ids.add(c['match_id'])
+            
+    # Filter only truly PENDING matches:
+    # 1. status is 'PENDING'
+    # 2. court_id is None
+    # 3. NOT in active_match_ids (Double check against live courts)
     pending = [
         m for m in matches 
-        if m['status'] == 'PENDING' and m.get('court_id') is None
+        if m['status'] == 'PENDING' 
+        and m.get('court_id') is None
+        and m['id'] not in active_match_ids
     ]
     
     # Sort logic: Low Round first, then Low ID
