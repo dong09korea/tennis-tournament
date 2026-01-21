@@ -52,14 +52,22 @@ if 'intro_accepted' not in st.session_state:
         padding-top: 10px;
     }
     /* Force Button Text Color to Black for better visibility on Yellow Primary */
-    div.stButton > button {
+    /* Force Button Text Color to Black for better visibility on Yellow Primary */
+    div.stButton > button, div.stButton > button p, div[data-testid="stBaseButton-secondary"] {
         color: black !important;
         font-weight: bold !important;
         background-color: #ccff00 !important; /* Force Tennis Yellow */
         border: none !important;
     }
-    div.stButton > button:hover {
+    div.stButton > button:hover, div.stButton > button:hover p {
         background-color: #b3e600 !important;
+        color: black !important;
+    }
+    /* Specifically target Primary buttons if they differ */
+    button[kind="primary"] {
+        color: black !important;
+    }
+    button[kind="primary"] p {
         color: black !important;
     }
     </style>
