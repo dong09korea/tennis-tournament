@@ -35,8 +35,7 @@ def render(db):
         matches = db.get_matches()
         teams = db.get_teams()
         
-        # DEBUG: Check Version
-        st.write(f"DEBUG: Active Courts = {len(courts)}")
+
         
         c_cols = st.columns(3)
         for i in range(len(courts)):
