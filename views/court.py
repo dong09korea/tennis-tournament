@@ -144,12 +144,10 @@ def render(db, court_id):
         warn_end_b = logic.is_match_ending_point(match, 'B')
 
         if st.button("득점 (B)", key="score_b", use_container_width=True, type="primary"):
-            st.toast("DEBUG: B Button Clicked") 
             if warn_end_b:
                 st.session_state[f"confirm_end_{match_id}_B"] = True
                 st.rerun()
             else:
-                st.toast("DEBUG: Calling process_score B") 
                 logic.process_score(db, match_id, 'B')
                 st.rerun()
 
