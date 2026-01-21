@@ -175,10 +175,12 @@ def assign_matches_to_courts(db):
 
 
 def process_score(db, match_id, team_side):
+    print(f"DEBUG: process_score called for {match_id}, side {team_side}") # DEBUG
     # team_side: 'A' or 'B'
     matches = db.get_matches()
     match = next((m for m in matches if m['id'] == match_id), None)
     if not match:
+        print("DEBUG: Match not found!") # DEBUG
         return
 
     is_knockout = isinstance(match['group_id'], str) # 16강, 8강 etc are strings
