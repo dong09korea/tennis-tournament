@@ -68,9 +68,15 @@ def render(db):
                 for m in pending_matches:
                     tA = next(t for t in db.get_teams() if t['id'] == m['team_a_id'])['name']
                     tB = next(t for t in db.get_teams() if t['id'] == m['team_b_id'])['name']
+                    
+                    # Court Info (If assigned)
+                    c_id = m.get('court_id')
+                    c_str = f"{c_id}번 코트" if c_id else "미정"
+                    
                     p_list.append({
                         "경기": f"{m['group_id']}조 {m['round']}R",
-                        "대진": f"{tA} vs {tB}"
+                        "대진": f"{tA} vs {tB}",
+                        "예정 코트": c_str
                     })
                 st.dataframe(pd.DataFrame(p_list), hide_index=True, use_container_width=True)
             else:
