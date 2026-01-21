@@ -330,6 +330,7 @@ def render(db):
                             tb_label = " <span style='color:orange;'>(TIE BREAK)</span>"
 
                         # Custom HTML for centered and better layout
+                        st.markdown(f"""
                             <div style="text-align: center;">
                                 <div style="font-size: 0.9em; color: #ccc; margin-bottom: 5px;">
                                     {match['group_id']}조 {match['round']}경기{tb_label}
