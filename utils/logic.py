@@ -469,8 +469,12 @@ def get_closing_matches(db):
 def get_pending_matches(db, limit=5):
     """Returns next pending matches based on order (ID or Round)"""
     matches = db.get_matches()
-    # Filter PENDING
-    pending = [m for m in matches if m['status'] == 'PENDING']
+    # Filter only truly PENDING matches (not assigned to any court, not in progress)
+    # The 'status' field should be 'PENDING', but defensive coding: also check court_id is None
+    pending = [
+        m for m in matches 
+        if m['status'] == 'PENDING' and m.get('court_id') is None
+    ]
     
     # Sort logic: Low Round first, then Low ID
     # Assuming match IDs are somewhat chronological or groups sorted.
