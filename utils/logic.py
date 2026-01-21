@@ -189,7 +189,16 @@ def process_score(db, match_id, team_side):
         print("DEBUG: Match not found!") # DEBUG
         return
 
-    is_knockout = isinstance(match['group_id'], str) # 16강, 8강 etc are strings
+    # Determine if knockout based on group_id type
+    # If group_id is convertible to int (e.g. "1", 1), it is Group Stage.
+    # If not (e.g. "16강"), it is Knockout.
+    gid = match['group_id']
+    is_knockout = False
+    try:
+        int(gid)
+        is_knockout = False
+    except:
+        is_knockout = True
     
     # Rule: 
     # Prelim: Win at 6, Draw at 5-5.
@@ -352,7 +361,14 @@ def is_match_ending_point(match, team_side):
     
     p_me = point_a if team_side == 'A' else point_b
     
-    is_knockout = isinstance(match['group_id'], str)
+    # Determine if knockout based on group_id type
+    gid = match['group_id']
+    is_knockout = False
+    try:
+        int(gid)
+        is_knockout = False
+    except:
+        is_knockout = True
     
     if p_me >= 3: # Match Point candidates
         new_s_a = score_a + (1 if team_side == 'A' else 0)
