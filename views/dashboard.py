@@ -117,24 +117,24 @@ def render(db):
                         # Tie Break Logic
                         tb_label = ""
                         if match.get('is_tie_break'):
-                            tb_label = " (TIE BREAK)"
-                            
-                        st.caption(f"{match['group_id']}조 {match['round']}경기{tb_label}")
-                        
-                        # Score Display using Metric or similar
-                        # st.metric is good but takes up space.
-                        # Let's use simple markdown for compactness inside container
-                        
-                        col_score = st.columns([1, 0.2, 1])
-                        with col_score[0]:
-                            st.write(f"{nA}")
-                        with col_score[1]:
-                            st.write("vs")
-                        with col_score[2]:
-                            st.write(f"{nB}")
-                            
-                        st.subheader(f"{match['score_a']} : {match['score_b']}")
-                        
+                            tb_label = " <span style='color:orange;'>(TIE BREAK)</span>"
+
+                        # Custom HTML for centered and better layout
+                        st.markdown(f"""
+                            <div style="text-align: center;">
+                                <div style="font-size: 0.9em; color: gray; margin-bottom: 5px;">
+                                    {match['group_id']}조 {match['round']}경기{tb_label}
+                                </div>
+                                <div style="display: flex; justify-content: center; align-items: center; gap: 10px; margin-bottom: 10px;">
+                                    <div style="font-size: 1.2em; font-weight: bold; width: 45%; text-align: right;">{nA}</div>
+                                    <div style="font-size: 0.9em; color: #888;">vs</div>
+                                    <div style="font-size: 1.2em; font-weight: bold; width: 45%; text-align: left;">{nB}</div>
+                                </div>
+                                <div style="font-size: 2.2em; font-weight: bold; color: #4CAF50; margin-bottom: 5px;">
+                                    {match['score_a']} : {match['score_b']}
+                                </div>
+                        """, unsafe_allow_html=True)
+
                         # Points
                         pts_map = ['0', '15', '30', '40', 'AD']
                         if match.get('is_tie_break'):
@@ -143,10 +143,15 @@ def render(db):
                             pa = pts_map[match['point_a']]
                             pb = pts_map[match['point_b']]
                             
-                        st.caption(f"Points: {pa} - {pb}")
-                        
-                        if match['status'] == 'LIVE':
-                             st.write("🔥 진행 중")
+                        st.markdown(f"""
+                                <div style="font-size: 1.0em; color: #aaa;">
+                                    Points: {pa} - {pb}
+                                </div>
+                                <div style="margin-top: 10px; color: #FF4B4B; font-weight: bold;">
+                                    🔥 LIVE
+                                </div>
+                            </div>
+                        """, unsafe_allow_html=True)
                     else:
                         st.caption("대기 중")           
 
