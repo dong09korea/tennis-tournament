@@ -3,6 +3,7 @@ import pandas as pd
 from utils import logic
 from views import bracket
 from utils import auth
+import datetime
 
 def render(db):
     # Secrets에서 비밀번호 로드 (없으면 기본값 경고)
@@ -47,11 +48,22 @@ def render(db):
                 new_n_groups = st.number_input("조 개수", min_value=2, max_value=32, value=db.config.get("num_groups", 8))
             with c3:
                 new_n_courts = st.number_input("코트 수", min_value=1, max_value=20, value=db.config.get("num_courts", 6))
+            
+            # Start Time
+            def parse_time(t_str):
+                try:
+                    return datetime.datetime.strptime(t_str, "%H:%M").time()
+                except:
+                    return datetime.time(9, 0)
+            
+            current_start_time = parse_time(db.config.get("start_time", "09:00"))
+            new_start_time = st.time_input("대회 시작 시간", value=current_start_time)
                 
             if st.form_submit_button("설정 적용 (새로고침)"):
                 db.config["num_teams"] = new_n_teams
                 db.config["num_groups"] = new_n_groups
                 db.config["num_courts"] = new_n_courts
+                db.config["start_time"] = new_start_time.strftime("%H:%M")
                 
                 # Re-init courts if needed
                 db.courts = [{"id": i+1, "match_id": None} for i in range(new_n_courts)]
