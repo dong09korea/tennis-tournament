@@ -161,7 +161,7 @@ else:
     st.caption("원하시는 서비스를 선택하세요")
     
     # Public Section (Mobile First)
-    if st.button("📊 참가자용 대시보드 (전체 현황)", use_container_width=True, type="primary"):
+    if st.button("📊 참가자용 대시보드 (전체 현황)", use_container_width=True):
         st.query_params["view"] = "dashboard"
         st.rerun()
         
