@@ -140,7 +140,14 @@ def assign_matches_to_courts(db):
     # And interleave groups to avoid one group monopolizing courts if possible
     # Current sort: Round (asc), Group ID (asc)
     # This works reasonable well.
-    pending_matches.sort(key=lambda m: (m['round'], str(m['group_id']))) # str for group_id to handle mixed types safely? (though prelim is int)
+    def sort_key(m):
+        gid = m['group_id']
+        try:
+            return (m['round'], int(gid))
+        except:
+             return (m['round'], str(gid))
+             
+    pending_matches.sort(key=sort_key)
     
     for court in empty_courts:
         # Find first candidate match where teams are NOT busy
