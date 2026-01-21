@@ -160,18 +160,41 @@ else:
 
     st.markdown(f"""
     <div style="
-        background-color: #ccff00;
-        color: #000000;
-        padding: 20px;
-        border-radius: 10px;
-        border: 2px solid #b3e600;
-        font-size: 1.1em;
-        line-height: 1.6;
+        background-color: #006030; /* Wimbledon Green */
+        color: #ffffff;
+        padding: 25px;
+        border-radius: 12px;
+        border-left: 10px solid #5c2d91; /* Wimbledon Purple Accent */
+        box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
     ">
-        <div style="font-weight: bold; margin-bottom: 10px; font-size: 1.2em;">
-            🕒 대회 시작 시간: {start_time_str}
+        <div style="
+            border-bottom: 2px solid #5c2d91;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        ">
+            <span style="font-size: 1.5em; margin-right: 10px;">🎾</span>
+            <span style="font-size: 1.3em; font-weight: bold; color: #ccff00;">OFFICIAL SCHEDULE</span>
         </div>
-        <div style="white-space: pre-wrap;">{notice_content}</div>
+        
+        <div style="font-size: 1.1em; margin-bottom: 20px;">
+            <span style="color: #aaa;">START TIME:</span> 
+            <span style="font-weight: bold; color: #fff; font-size: 1.2em; margin-left: 5px;">{start_time_str}</span>
+        </div>
+        
+        <div style="
+            background-color: rgba(0,0,0,0.2); 
+            padding: 15px; 
+            border-radius: 8px; 
+            white-space: pre-wrap; 
+            font-size: 1.05em; 
+            line-height: 1.6;
+            color: #eeeeee;
+        ">
+{notice_content}
+        </div>
     </div>
     """, unsafe_allow_html=True)
     
