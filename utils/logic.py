@@ -202,6 +202,11 @@ def process_score(db, match_id, team_side):
     except:
         is_knockout = True
     
+    # Failsafe: If Prelim, Force is_tie_break = False (User feedback: No tie break in prelims)
+    if not is_knockout and match.get('is_tie_break'):
+        print(f"DEBUG: Correcting is_tie_break=True for Prelim match {match_id}")
+        match['is_tie_break'] = False
+    
     # Rule: 
     # Prelim: Win at 6, Draw at 5-5.
     # Knockout: Win at 6... BUT if 5-5, enter TIE BREAK.

@@ -120,7 +120,9 @@ def render(db, court_id):
             st.warning("⚠️ 이 점수면 경기가 종료됩니다! 정말입니까?")
             c1, c2 = st.columns(2)
             with c1:
-                if st.button("네, 경기 종료", key=f"conf_yes_A_{match_id}", type="primary"):
+                # Force string key
+                if st.button("네, 경기 종료", key=f"conf_yes_A_{str(match_id)}", type="primary"):
+                    st.error("Processing Match End...") # Visible Debug
                     logic.process_score(db, match_id, 'A')
                     del st.session_state[f"confirm_end_{match_id}_A"]
                     st.rerun()
@@ -155,7 +157,9 @@ def render(db, court_id):
             st.warning("⚠️ 이 점수면 경기가 종료됩니다! 정말입니까?")
             c1, c2 = st.columns(2)
             with c1:
-                if st.button("네, 경기 종료", key=f"conf_yes_B_{match_id}", type="primary"):
+                # Force string key
+                if st.button("네, 경기 종료", key=f"conf_yes_B_{str(match_id)}", type="primary"):
+                    st.error("Processing Match End...") # Visible Debug
                     logic.process_score(db, match_id, 'B')
                     del st.session_state[f"confirm_end_{match_id}_B"]
                     st.rerun()
