@@ -153,14 +153,27 @@ else:
     # Fetch start time
     start_time_str = db.config.get("start_time", "09:00")
     
-    st.info(f"""
-    **대회 시작 시간:** {start_time_str}
-    
-    {db.config.get('notice', '''**진행 순서:**
+    notice_content = db.config.get('notice', '''**진행 순서:**
 1. **예선 조별 리그** (각 조 풀리그, 5:5 무승부)
 2. **본선 토너먼트** (각 조 상위 팀 진출, 16강 ~ 결승)
-3. **시상식 (우승, 준우승, 3위)**''')}
-    """)
+3. **시상식 (우승, 준우승, 3위)**''')
+
+    st.markdown(f"""
+    <div style="
+        background-color: #ccff00;
+        color: #000000;
+        padding: 20px;
+        border-radius: 10px;
+        border: 2px solid #b3e600;
+        font-size: 1.1em;
+        line-height: 1.6;
+    ">
+        <div style="font-weight: bold; margin-bottom: 10px; font-size: 1.2em;">
+            🕒 대회 시작 시간: {start_time_str}
+        </div>
+        <div style="white-space: pre-wrap;">{notice_content}</div>
+    </div>
+    """, unsafe_allow_html=True)
     
     st.markdown("---")
     st.caption("원하시는 서비스를 선택하세요")
