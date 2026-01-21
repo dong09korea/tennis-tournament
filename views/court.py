@@ -32,6 +32,16 @@ def render(db, court_id):
 
     st.markdown(f"<h1 style='text-align: center;'>{court_id}번 코트</h1>", unsafe_allow_html=True)
     
+    # CSS to fix button text color (White on Neon Yellow is bad)
+    st.markdown("""
+    <style>
+    div[data-testid="stButton"] > button[kind="primary"] {
+        color: black !important;
+        font-weight: bold !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     match_id = court['match_id']
     if not match_id:
         st.info("배정된 경기가 없습니다. 대기 중...")
@@ -46,7 +56,13 @@ def render(db, court_id):
     tA = next(t for t in teams if t['id'] == match['team_a_id'])
     tB = next(t for t in teams if t['id'] == match['team_b_id'])
     
-    group_label = f"{match['group_id']}조" if isinstance(match['group_id'], int) else match['group_id']
+    # Fix Group Label: Handle string/int mixture from logic/Excel
+    gid = match['group_id']
+    if str(gid).isdigit():
+        group_label = f"{gid}조"
+    else:
+        group_label = str(gid)
+        
     st.markdown(f"<h3 style='text-align: center;'>{group_label} {match['round']}경기</h3>", unsafe_allow_html=True)
 
     # Scoreboard Layout

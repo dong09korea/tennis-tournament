@@ -176,12 +176,12 @@ def assign_matches_to_courts(db):
 
 def process_score(db, match_id, team_side):
     print(f"DEBUG: process_score called for {match_id}, side {team_side}") # DEBUG
-    # team_side: 'A' or 'B'
-    matches = db.get_matches()
-    match = next((m for m in matches if m['id'] == match_id), None)
-    if not match:
-        print("DEBUG: Match not found!") # DEBUG
-        return
+    try:
+        matches = db.get_matches()
+        match = next((m for m in matches if m['id'] == match_id), None)
+        if not match:
+            print("DEBUG: Match not found!") # DEBUG
+            return
 
     is_knockout = isinstance(match['group_id'], str) # 16강, 8강 etc are strings
     
@@ -313,6 +313,11 @@ def process_score(db, match_id, team_side):
                  match['is_tie_break'] = True
             
             db.update_match(match_id, match)
+            
+    except Exception as e:
+        import traceback
+        print(f"ERROR in process_score: {e}")
+        traceback.print_exc()
 
 def is_match_ending_point(match, team_side):
     score_a = match['score_a']
