@@ -181,6 +181,9 @@ def assign_matches_to_courts(db):
 
 
 def process_score(db, match_id, team_side):
+    with open("debug_log.txt", "a", encoding="utf-8") as f:
+        f.write(f"DEBUG: process_score called for match {match_id}, side {team_side}\n")
+        
     print(f"DEBUG: process_score called for {match_id}, side {team_side}") # DEBUG
     matches = db.get_matches()
     match = next((m for m in matches if m['id'] == match_id), None)
@@ -310,6 +313,9 @@ def process_score(db, match_id, team_side):
             winner_id = match['team_b_id']
             
         if match_finished:
+            with open("debug_log.txt", "a", encoding="utf-8") as f:
+                f.write(f"DEBUG: Match Finished! Winner: {winner_id}, Draw: {is_draw}\n")
+            
             court_id = match['court_id']
             db.update_match(match_id, {
                 "status": "COMPLETED",
