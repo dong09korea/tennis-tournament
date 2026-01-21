@@ -277,6 +277,7 @@ def process_score(db, match_id, team_side):
                 match['point_b'] += 1
             
     if game_winner:
+        print(f"DEBUG: Game Winner determined: {game_winner}") # DEBUG
         # Reset points
         match['point_a'] = 0
         match['point_b'] = 0
@@ -297,6 +298,7 @@ def process_score(db, match_id, team_side):
         is_draw = False
         
         if rule_draw_at_5_5 and sa == 5 and sb == 5:
+            print("DEBUG: 5:5 Draw Condition Met!") # DEBUG
             match_finished = True
             is_draw = True
         elif sa >= rule_win_games:

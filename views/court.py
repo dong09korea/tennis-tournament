@@ -108,7 +108,7 @@ def render(db, court_id):
         
         warn_end_a = logic.is_match_ending_point(match, 'A')
         
-        if st.button("득점 (A)", key="score_a", use_container_width=True, type="primary"):
+        if st.button("득점 (A)", key=f"score_a_{match_id}", use_container_width=True, type="primary"):
             if warn_end_a:
                 st.session_state[f"confirm_end_{match_id}_A"] = True
                 st.rerun()
@@ -120,17 +120,17 @@ def render(db, court_id):
             st.warning("⚠️ 이 점수면 경기가 종료됩니다! 정말입니까?")
             c1, c2 = st.columns(2)
             with c1:
-                if st.button("네, 경기 종료", key="conf_yes_A", type="primary"):
+                if st.button("네, 경기 종료", key=f"conf_yes_A_{match_id}", type="primary"):
                     logic.process_score(db, match_id, 'A')
                     del st.session_state[f"confirm_end_{match_id}_A"]
                     st.rerun()
             with c2:
-                if st.button("아니오 (취소)", key="conf_no_A"):
+                if st.button("아니오 (취소)", key=f"conf_no_A_{match_id}"):
                     del st.session_state[f"confirm_end_{match_id}_A"]
                     st.rerun()
                     
         # ... undo ...
-        if st.button("취소 (A)", key="undo_a", use_container_width=True):
+        if st.button("취소 (A)", key=f"undo_a_{match_id}", use_container_width=True):
              logic.undo_score(db, match_id, 'A')
              st.rerun()
 
@@ -143,7 +143,7 @@ def render(db, court_id):
         
         warn_end_b = logic.is_match_ending_point(match, 'B')
 
-        if st.button("득점 (B)", key="score_b", use_container_width=True, type="primary"):
+        if st.button("득점 (B)", key=f"score_b_{match_id}", use_container_width=True, type="primary"):
             if warn_end_b:
                 st.session_state[f"confirm_end_{match_id}_B"] = True
                 st.rerun()
@@ -155,7 +155,7 @@ def render(db, court_id):
             st.warning("⚠️ 이 점수면 경기가 종료됩니다! 정말입니까?")
             c1, c2 = st.columns(2)
             with c1:
-                if st.button("네, 경기 종료", key="conf_yes_B", type="primary"):
+                if st.button("네, 경기 종료", key=f"conf_yes_B_{match_id}", type="primary"):
                     logic.process_score(db, match_id, 'B')
                     del st.session_state[f"confirm_end_{match_id}_B"]
                     st.rerun()
