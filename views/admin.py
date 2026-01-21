@@ -593,7 +593,7 @@ def render(db):
             
             # Try to guess IP or let user input. 
             default_url = "https://irmgard-unshowering-casen.ngrok-free.app" 
-            base_url = st.text_input("현재 대회 서버 주소 (터미널의 Network URL을 입력하세요)", value=default_url, key="qr_url_force_new")
+            base_url = st.text_input("현재 대회 서버 주소 (터미널의 Network URL을 입력하세요)", value=default_url, key="qr_url_fixed_v2")
             
             if base_url:
                 # One QR for Home
