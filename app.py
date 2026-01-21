@@ -11,27 +11,56 @@ if 'intro_accepted' not in st.session_state:
     st.markdown("""
     <style>
     .fbi-warning {
-        background-color: #000;
-        color: #fff;
-        padding: 50px;
+        background-color: #0d0d0d;
+        color: #e5e5e5;
+        padding: 40px;
         text-align: center;
-        border: 5px solid #fff;
-        font-family: 'Arial Black', sans-serif;
+        border: 4px solid #cc0000; /* Red Border like typical warnings */
+        box-shadow: 0 0 20px rgba(204, 0, 0, 0.5);
+        font-family: 'Arial', sans-serif;
         margin-top: 50px;
-    }
-    .fbi-title {
-        font-size: 3em;
-        color: #FFD700; /* Gold */
-        margin-bottom: 20px;
-    }
-    .fbi-text {
-        font-size: 1.2em;
-        line-height: 1.6;
         margin-bottom: 30px;
     }
+    .fbi-title {
+        font-size: 3.5em;
+        font-weight: 900;
+        color: #fff;
+        background-color: #cc0000;
+        display: inline-block;
+        padding: 5px 20px;
+        margin-bottom: 30px;
+        letter-spacing: 2px;
+    }
+    .fbi-subtitle {
+        font-size: 1.5em;
+        font-weight: bold;
+        color: #cc0000;
+        margin-bottom: 20px;
+        text-transform: uppercase;
+    }
+    .fbi-text {
+        font-size: 1.1em;
+        line-height: 1.8;
+        margin-bottom: 30px;
+        color: #fff;
+    }
     .fbi-footer {
-        font-size: 0.9em;
-        color: #aaa;
+        font-size: 0.8em;
+        color: #888;
+        margin-top: 20px;
+        border-top: 1px solid #333;
+        padding-top: 10px;
+    }
+    /* Force Button Text Color to Black for better visibility on Yellow Primary */
+    div.stButton > button {
+        color: black !important;
+        font-weight: bold !important;
+        background-color: #ccff00 !important; /* Force Tennis Yellow */
+        border: none !important;
+    }
+    div.stButton > button:hover {
+        background-color: #b3e600 !important;
+        color: black !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -39,15 +68,19 @@ if 'intro_accepted' not in st.session_state:
     st.markdown("""
         <div class="fbi-warning">
             <div class="fbi-title">WARNING</div>
+            <div class="fbi-subtitle">FBI ANTI-PIRACY WARNING</div>
             <div class="fbi-text">
-                <strong>본 프로그램은 "라켓업 홍보이사 김동현" 님에 의해 제작되었습니다.</strong><br><br>
-                저작권법 제501조 및 국제 협약에 따라<br>
-                이 소프트웨어의 무단 복제, 배포 및 상업적 이용을 엄격히 금지합니다.<br>
+                <strong>본 프로그램은 "라켓업 홍보이사 김동현" 님에 의해 제작되었습니다.</strong><br>
                 <br>
-                위반 시 민, 형사상의 법적 책임을 물을 수 있으며<br>
-                최대 5년 이하의 징역 또는 5천만 원 이하의 벌금에 처해질 수 있습니다.
+                저작권법 제501조 및 국제 형사법에 의거하여<br>
+                이 소프트웨어의 무단 복제, 배포, 방송 및 상업적 이용을 <strong>엄격히 금지</strong>합니다.<br>
+                <br>
+                <span style="color: #ff4b4b;">위반 행위 적발 시, 예고 없이 민·형사상의 법적 조치가 취해질 수 있으며<br>
+                최대 5년 이하의 징역 또는 5천만 원 이하의 벌금에 처해질 수 있습니다.</span>
             </div>
-            <div class="fbi-footer">RACKET UP ANTI-PIRACY DEPARTMENT</div>
+            <div class="fbi-footer">
+                UNAUTHORIZED REPRODUCTION OR DISTRIBUTION IS INVESTIGATED BY THE FBI AND IS PUNISHABLE BY FEDERAL LAW.
+            </div>
         </div>
     """, unsafe_allow_html=True)
     
