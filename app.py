@@ -52,22 +52,32 @@ if 'intro_accepted' not in st.session_state:
         padding-top: 10px;
     }
     /* Force Button Text Color to Black for better visibility on Yellow Primary */
-    /* Force Button Text Color to Black for better visibility on Yellow Primary */
-    div.stButton > button, div.stButton > button p, div[data-testid="stBaseButton-secondary"] {
+    div.stButton > button, 
+    div.stButton > button p, 
+    div.stButton > button span,
+    div.stButton > button div,
+    button[kind="primary"],
+    button[kind="primary"] * {
         color: black !important;
         font-weight: bold !important;
         background-color: #ccff00 !important; /* Force Tennis Yellow */
         border: none !important;
     }
-    div.stButton > button:hover, div.stButton > button:hover p {
+    /* Even deeper targeting for specific Streamlit versions */
+    div.stButton button div[data-testid="stMarkdownContainer"] p {
+         color: black !important;
+    }
+    
+    div.stButton > button:hover, 
+    div.stButton > button:hover *,
+    div.stButton > button:active,
+    div.stButton > button:focus {
         background-color: #b3e600 !important;
         color: black !important;
     }
-    /* Specifically target Primary buttons if they differ */
-    button[kind="primary"] {
-        color: black !important;
-    }
-    button[kind="primary"] p {
+    
+    /* Specific target for the primary button container if needed */
+    div[data-testid="stBaseButton-primary"] {
         color: black !important;
     }
     </style>
