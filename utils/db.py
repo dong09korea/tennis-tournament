@@ -268,7 +268,18 @@ class SupabaseDatabase:
         # Sanitize
         if 'group_id' in updates: updates['group_id'] = str(updates['group_id'])
         
-        self._retry(lambda: self.client.table('matches').update(updates).eq('id', match_id).execute())
+        # Remove keys that shouldn't be updated or cause issues
+        start_safe_updates = {k: v for k, v in updates.items() if k not in ['id', 'created_at', 'updated_at']}
+        
+        # Debug Log
+        print(f"DEBUG: Updating match {match_id} with {start_safe_updates.keys()}")
+        
+        def _exec():
+            res = self.client.table('matches').update(start_safe_updates).eq('id', match_id).execute()
+            print(f"DEBUG: Update Result: {res.data}")
+            return res
+            
+        self._retry(_exec)
         
         # If 'status' COMPLETED, update court? Handled by logic usually.
         # Return updated logic locally?

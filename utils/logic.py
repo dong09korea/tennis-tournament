@@ -313,6 +313,10 @@ def process_score(db, match_id, team_side):
             
             db.update_match(match_id, match)
 
+    else:
+        # No game winner, just points update
+        db.update_match(match_id, match)
+
 def is_match_ending_point(match, team_side):
     score_a = match['score_a']
     score_b = match['score_b']
