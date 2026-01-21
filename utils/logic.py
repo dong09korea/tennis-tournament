@@ -440,7 +440,8 @@ def get_closing_matches(db):
     - Or is_tie_break is True
     """
     matches = db.get_matches()
-    live_matches = [m for m in matches if m['status'] == 'LIVE']
+    # Criteria: Status is LIVE OR has a court assigned (Fail-safe for data sync issues)
+    live_matches = [m for m in matches if m['status'] == 'LIVE' or m.get('court_id') is not None]
     
     closing = []
     for m in live_matches:
