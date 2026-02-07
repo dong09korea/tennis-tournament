@@ -1,0 +1,76 @@
+:root {
+  /* Wimbledon Palette */
+  --wimbledon-green: #004E32; /* Deep Fern Green */
+  --wimbledon-purple: #3A0256; /* Deep Purple */
+  --tennis-yellow: #D5FF00;   /* Neon Yellow */
+  --court-green: #2C6E49;     /* Lighter green for court surfaces */
+  
+  --bg-color: #0d1f12;        /* Very dark green background */
+  --card-bg: #1a3c26;         /* Card background */
+  --text-primary: #ffffff;
+  --text-secondary: #a5d6a7;
+  
+  --font-main: 'Inter', system-ui, Avenir, Helvetica, Arial, sans-serif;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+  background-color: var(--bg-color);
+  color: var(--text-primary);
+  font-family: var(--font-main);
+  overflow-x: hidden;
+}
+
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Utilities */
+.card {
+  background-color: var(--card-bg);
+  border-radius: 12px;
+  padding: 1.5em;
+  border-left: 6px solid var(--tennis-yellow);
+  box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+  margin-bottom: 1rem;
+  transition: transform 0.2s;
+}
+
+.card:active {
+  transform: scale(0.98);
+}
+
+h1, h2, h3 {
+  color: var(--tennis-yellow);
+}
+
+button {
+  background-color: var(--tennis-yellow);
+  color: var(--wimbledon-green);
+  border: none;
+  border-radius: 8px;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.25s;
+}
+
+button:hover {
+  filter: brightness(0.9);
+}
+
+@media (max-width: 600px) {
+  #root {
+    padding: 1rem;
+  }
+}
