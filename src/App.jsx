@@ -89,7 +89,7 @@ function App() {
                     onLogin={(val) => setIsAdmin(val)}
                 />
             ) : activeTab === 'match' ? (
-                <Bracket matches={data.matches} teams={data.teams} isAdmin={isAdmin} />
+                <Bracket matches={data.matches} teams={data.teams} courts={data.courts} isAdmin={isAdmin} />
             ) : (
                 <Standings teams={data.teams} groups={data.groups} />
             )}
