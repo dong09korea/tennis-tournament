@@ -1,6 +1,7 @@
+```javascript
 import React, { useState } from 'react';
 import { generateGroups, generateSchedule, assignMatchesToCourts } from '../utils/tournamentLogic';
-import { uploadData } from '../services/firebase';
+import { uploadData, updateMatch, resetTournamentData } from '../services/firebase';
 import { Users, Settings, PlayCircle, RefreshCcw, Trash2, CheckCircle, AlertTriangle, LogIn } from 'lucide-react';
 
 const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
@@ -34,14 +35,14 @@ const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
             // Parse Teams
             const teamNames = teamInput.split('\n').filter(n => n.trim());
             const teams = teamNames.map((name, idx) => ({
-                id: `t${idx + 1}`,
+                id: `t${ idx + 1 } `,
                 name: name.trim(),
                 player1: "",
                 player2: ""
             }));
 
             if (teams.length < numGroups) {
-                if (!confirm(`팀 수(${teams.length})가 조 개수(${numGroups})보다 적습니다. 계속 진행할까요?`)) {
+                if (!confirm(`팀 수(${ teams.length })가 조 개수(${ numGroups })보다 적습니다.계속 진행할까요 ? `)) {
                     setIsProcessing(false);
                     return;
                 }
@@ -72,19 +73,16 @@ const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
     };
 
     const handleReset = async () => {
-        if (confirm("⚠️ 정말로 대회를 초기화하시겠습니까?\n모든 데이터가 영구적으로 삭제됩니다.")) {
+        if (confirm("정말로 모든 대회를 초기화하시겠습니까? (데이터 삭제됨)")) {
             setIsProcessing(true);
             try {
-                const emptyData = {
-                    teams: [],
-                    groups: [],
-                    matches: [],
-                    courts: Array.from({ length: numCourts }, (_, i) => ({ id: i + 1, match_id: null }))
-                };
-                await uploadData(emptyData);
+                // Call dedicated reset function
+                await resetTournamentData();
                 setStatusMsg("🗑️ 데이터가 초기화되었습니다.");
-            } catch (e) {
-                alert("초기화 실패: " + e.message);
+                setTimeout(() => setStatusMsg(""), 3000);
+            } catch (error) {
+                console.error("초기화 실패:", error);
+                setStatusMsg("❌ 초기화 실패: " + error.message);
             } finally {
                 setIsProcessing(false);
             }
@@ -132,42 +130,42 @@ const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
                     </form>
                 </div>
                 <style>{`
-                    .login-container {
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        min-height: 60vh;
-                    }
-                    .login-box {
-                        background: rgba(0, 0, 0, 0.4);
-                        padding: 3rem;
-                        border-radius: 20px;
-                        text-align: center;
-                        border: 1px solid rgba(255, 255, 255, 0.1);
-                        backdrop-filter: blur(10px);
-                        max-width: 400px;
-                        width: 100%;
-                    }
-                    .icon-wrapper {
-                        margin-bottom: 1.5rem;
-                        background: rgba(213, 255, 0, 0.1);
-                        width: 80px;
-                        height: 80px;
-                        border-radius: 50%;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                        margin: 0 auto 1.5rem;
-                    }
-                    .login-box h2 {
-                        color: white;
-                        margin-bottom: 0.5rem;
-                    }
-                    .login-box p {
-                        color: #aaa;
-                        margin-bottom: 2rem;
-                    }
-                `}</style>
+    .login - container {
+    display: flex;
+    align - items: center;
+    justify - content: center;
+    min - height: 60vh;
+}
+                    .login - box {
+    background: rgba(0, 0, 0, 0.4);
+    padding: 3rem;
+    border - radius: 20px;
+    text - align: center;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    backdrop - filter: blur(10px);
+    max - width: 400px;
+    width: 100 %;
+}
+                    .icon - wrapper {
+    margin - bottom: 1.5rem;
+    background: rgba(213, 255, 0, 0.1);
+    width: 80px;
+    height: 80px;
+    border - radius: 50 %;
+    display: flex;
+    align - items: center;
+    justify - content: center;
+    margin: 0 auto 1.5rem;
+}
+                    .login - box h2 {
+    color: white;
+    margin - bottom: 0.5rem;
+}
+                    .login - box p {
+    color: #aaa;
+    margin - bottom: 2rem;
+}
+`}</style>
             </div>
         );
     }
@@ -291,220 +289,220 @@ const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
             </div>
 
             <style>{`
-                .dashboard-container {
-                    padding: 1rem;
-                    max-width: 1200px;
-                    margin: 0 auto;
-                    color: white;
-                }
-                .dashboard-header {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                    margin-bottom: 2rem;
-                    padding-bottom: 1rem;
-                    border-bottom: 1px solid rgba(255,255,255,0.1);
-                }
-                .dashboard-header h2 {
-                    display: flex;
-                    align-items: center;
-                    font-size: 1.8rem;
-                    color: white; /* Header is white for contrast */
-                    margin: 0;
-                }
-                .status-badge {
-                    background: rgba(255,255,255,0.1);
-                    padding: 0.5rem 1rem;
-                    border-radius: 20px;
-                    font-size: 0.9rem;
-                    color: var(--text-secondary);
-                }
+    .dashboard - container {
+    padding: 1rem;
+    max - width: 1200px;
+    margin: 0 auto;
+    color: white;
+}
+                .dashboard - header {
+    display: flex;
+    justify - content: space - between;
+    align - items: center;
+    margin - bottom: 2rem;
+    padding - bottom: 1rem;
+    border - bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+                .dashboard - header h2 {
+    display: flex;
+    align - items: center;
+    font - size: 1.8rem;
+    color: white; /* Header is white for contrast */
+    margin: 0;
+}
+                .status - badge {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 0.5rem 1rem;
+    border - radius: 20px;
+    font - size: 0.9rem;
+    color: var(--text - secondary);
+}
 
-                .dashboard-grid {
-                    display: grid;
-                    grid-template-columns: 2fr 1fr;
-                    gap: 1.5rem;
-                }
+                .dashboard - grid {
+    display: grid;
+    grid - template - columns: 2fr 1fr;
+    gap: 1.5rem;
+}
+
+@media(max - width: 768px) {
+                    .dashboard - grid {
+        grid - template - columns: 1fr;
+    }
+}
+
+                .glass - card {
+    background: rgba(30, 30, 30, 0.6);
+    backdrop - filter: blur(10px);
+    border - radius: 16px;
+    padding: 1.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    box - shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
                 
-                @media (max-width: 768px) {
-                    .dashboard-grid {
-                        grid-template-columns: 1fr;
-                    }
-                }
+                .card - header {
+    margin - bottom: 1.5rem;
+    border - bottom: 1px solid rgba(255, 255, 255, 0.05);
+    padding - bottom: 0.5rem;
+}
+                .card - header h3 {
+    margin: 0;
+    font - size: 1.2rem;
+    color: var(--tennis - yellow);
+    display: flex;
+    align - items: center;
+}
 
-                .glass-card {
-                    background: rgba(30, 30, 30, 0.6);
-                    backdrop-filter: blur(10px);
-                    border-radius: 16px;
-                    padding: 1.5rem;
-                    border: 1px solid rgba(255, 255, 255, 0.05);
-                    box-shadow: 0 4px 20px rgba(0,0,0,0.2);
-                }
+                .modern - input, .modern - textarea {
+    width: 100 %;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: white;
+    padding: 0.8rem;
+    border - radius: 8px;
+    font - size: 1rem;
+    font - family: inherit;
+    transition: border - color 0.3s;
+    box - sizing: border - box; /* Fix width overlap */
+}
+                .modern - input: focus, .modern - textarea:focus {
+    outline: none;
+    border - color: var(--tennis - yellow);
+    background: rgba(0, 0, 0, 0.5);
+}
+                .modern - textarea {
+    min - height: 200px;
+    line - height: 1.5;
+    resize: vertical;
+}
+
+                .input - row {
+    display: flex;
+    gap: 1rem;
+    margin: 1rem 0;
+}
+                .input - group {
+    flex: 1;
+}
+                .input - group label {
+    display: block;
+    margin - bottom: 0.5rem;
+    color: #aaa;
+    font - size: 0.9rem;
+}
+
+                .action - buttons {
+    display: flex;
+    gap: 1rem;
+    margin - top: 2rem;
+}
                 
-                .card-header {
-                    margin-bottom: 1.5rem;
-                    border-bottom: 1px solid rgba(255,255,255,0.05);
-                    padding-bottom: 0.5rem;
-                }
-                .card-header h3 {
-                    margin: 0;
-                    font-size: 1.2rem;
-                    color: var(--tennis-yellow);
-                    display: flex;
-                    align-items: center;
-                }
-
-                .modern-input, .modern-textarea {
-                    width: 100%;
-                    background: rgba(0,0,0,0.3);
-                    border: 1px solid rgba(255,255,255,0.1);
-                    color: white;
-                    padding: 0.8rem;
-                    border-radius: 8px;
-                    font-size: 1rem;
-                    font-family: inherit;
-                    transition: border-color 0.3s;
-                    box-sizing: border-box; /* Fix width overlap */
-                }
-                .modern-input:focus, .modern-textarea:focus {
-                    outline: none;
-                    border-color: var(--tennis-yellow);
-                    background: rgba(0,0,0,0.5);
-                }
-                .modern-textarea {
-                    min-height: 200px;
-                    line-height: 1.5;
-                    resize: vertical;
-                }
-
-                .input-row {
-                    display: flex;
-                    gap: 1rem;
-                    margin: 1rem 0;
-                }
-                .input-group {
-                    flex: 1;
-                }
-                .input-group label {
-                    display: block;
-                    margin-bottom: 0.5rem;
-                    color: #aaa;
-                    font-size: 0.9rem;
-                }
-
-                .action-buttons {
-                    display: flex;
-                    gap: 1rem;
-                    margin-top: 2rem;
-                }
-                
-                .modern-button {
-                    display: flex;
-                    align-items: center;
-                    justify-content: center;
-                    gap: 8px;
-                    padding: 1rem 1.5rem;
-                    border: none;
-                    border-radius: 8px;
-                    font-weight: bold;
-                    font-size: 1rem;
-                    cursor: pointer;
-                    transition: all 0.2s;
-                }
-                .modern-button:hover:not(:disabled) {
-                    transform: translateY(-2px);
-                    filter: brightness(1.1);
-                }
-                .modern-button:disabled {
-                    opacity: 0.5;
-                    cursor: not-allowed;
-                }
+                .modern - button {
+    display: flex;
+    align - items: center;
+    justify - content: center;
+    gap: 8px;
+    padding: 1rem 1.5rem;
+    border: none;
+    border - radius: 8px;
+    font - weight: bold;
+    font - size: 1rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+                .modern - button: hover: not(: disabled) {
+    transform: translateY(-2px);
+    filter: brightness(1.1);
+}
+                .modern - button:disabled {
+    opacity: 0.5;
+    cursor: not - allowed;
+}
                 
                 .primary {
-                    background: var(--tennis-yellow);
-                    color: black;
-                    flex: 2;
-                }
+    background: var(--tennis - yellow);
+    color: black;
+    flex: 2;
+}
                 .secondary {
-                    background: rgba(255,255,255,0.1);
-                    color: white;
-                    border: 1px solid rgba(255,255,255,0.2);
-                }
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
                 .danger {
-                    background: rgba(255, 68, 68, 0.2);
-                    color: #ff4444;
-                    border: 1px solid #ff4444;
-                    flex: 1;
-                }
+    background: rgba(255, 68, 68, 0.2);
+    color: #ff4444;
+    border: 1px solid #ff4444;
+    flex: 1;
+}
 
-                .full-width {
-                    width: 100%;
-                }
+                .full - width {
+    width: 100 %;
+}
 
-                .icon-gap {
-                    margin-right: 8px;
-                }
+                .icon - gap {
+    margin - right: 8px;
+}
 
-                .stat-grid {
-                    display: grid;
-                    grid-template-columns: repeat(3, 1fr);
-                    gap: 10px;
-                    text-align: center;
-                }
-                .stat-item {
-                    background: rgba(0,0,0,0.2);
-                    padding: 1rem 0.5rem;
-                    border-radius: 8px;
-                }
-                .stat-label {
-                    display: block;
-                    font-size: 0.8rem;
-                    color: #888;
-                    margin-bottom: 5px;
-                }
-                .stat-value {
-                    font-size: 1.5rem;
-                    font-weight: bold;
-                    color: white;
-                }
-                .stat-value.live { color: #ff4444; }
-                .stat-value.completed { color: #4caf50; }
+                .stat - grid {
+    display: grid;
+    grid - template - columns: repeat(3, 1fr);
+    gap: 10px;
+    text - align: center;
+}
+                .stat - item {
+    background: rgba(0, 0, 0, 0.2);
+    padding: 1rem 0.5rem;
+    border - radius: 8px;
+}
+                .stat - label {
+    display: block;
+    font - size: 0.8rem;
+    color: #888;
+    margin - bottom: 5px;
+}
+                .stat - value {
+    font - size: 1.5rem;
+    font - weight: bold;
+    color: white;
+}
+                .stat - value.live { color: #ff4444; }
+                .stat - value.completed { color: #4caf50; }
 
-                .card-desc {
-                    color: #aaa;
-                    font-size: 0.9rem;
-                    margin-bottom: 1.5rem;
-                    line-height: 1.4;
-                }
+                .card - desc {
+    color: #aaa;
+    font - size: 0.9rem;
+    margin - bottom: 1.5rem;
+    line - height: 1.4;
+}
 
-                .help-list {
-                    list-style: none;
-                    padding: 0;
-                    margin: 0;
-                    color: #ccc;
-                    font-size: 0.9rem;
-                }
-                .help-list li {
-                    margin-bottom: 0.5rem;
-                    line-height: 1.4;
-                }
+                .help - list {
+    list - style: none;
+    padding: 0;
+    margin: 0;
+    color: #ccc;
+    font - size: 0.9rem;
+}
+                .help - list li {
+    margin - bottom: 0.5rem;
+    line - height: 1.4;
+}
                 
-                .status-message {
-                    margin-top: 1rem;
-                    padding: 1rem;
-                    background: rgba(213, 255, 0, 0.1);
-                    color: var(--tennis-yellow);
-                    border-radius: 8px;
-                    text-align: center;
-                    font-weight: bold;
-                    animation: fadeIn 0.3s ease;
-                }
-                
-                @keyframes fadeIn {
+                .status - message {
+    margin - top: 1rem;
+    padding: 1rem;
+    background: rgba(213, 255, 0, 0.1);
+    color: var(--tennis - yellow);
+    border - radius: 8px;
+    text - align: center;
+    font - weight: bold;
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
                     from { opacity: 0; transform: translateY(5px); }
                     to { opacity: 1; transform: translateY(0); }
-                }
-            `}</style>
+}
+`}</style>
         </div>
     );
 };

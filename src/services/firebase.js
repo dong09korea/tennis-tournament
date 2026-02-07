@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, collection, onSnapshot, doc, setDoc, writeBatch } from "firebase/firestore";
+import { getFirestore, collection, onSnapshot, doc, setDoc, writeBatch, getDocs, deleteDoc } from "firebase/firestore";
 
 const firebaseConfig = {
     apiKey: "AIzaSyDcd71aoujH4yccQpMpGFixfvY15G_gPeA",
@@ -28,6 +28,9 @@ export const subscribeToData = (onDataUpdate) => {
         const matches = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         if (matches.length > 0) {
             onDataUpdate(prev => ({ ...prev, matches }));
+        } else {
+            // Handle empty case: if logic deletes all docs, we should update state to empty
+            onDataUpdate(prev => ({ ...prev, matches: [] }));
         }
     });
 
@@ -35,13 +38,18 @@ export const subscribeToData = (onDataUpdate) => {
         const teams = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         if (teams.length > 0) {
             onDataUpdate(prev => ({ ...prev, teams }));
+        } else {
+            onDataUpdate(prev => ({ ...prev, teams: [] }));
         }
     });
 
+    // Groups logic if needed
     const unsubscribeGroups = onSnapshot(collection(db, COLLECTIONS.GROUPS), (snapshot) => {
         const groups = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         if (groups.length > 0) {
             onDataUpdate(prev => ({ ...prev, groups }));
+        } else {
+            onDataUpdate(prev => ({ ...prev, groups: [] }));
         }
     });
 
@@ -55,9 +63,7 @@ export const subscribeToData = (onDataUpdate) => {
 export const uploadData = async (data) => {
     try {
         console.log("Starting upload...");
-        // Sanitize data: Firestore does not like 'undefined'.
         const cleanData = JSON.parse(JSON.stringify(data));
-
         const batch = writeBatch(db);
 
         cleanData.teams.forEach(team => {
@@ -75,15 +81,12 @@ export const uploadData = async (data) => {
             batch.set(ref, match);
         });
 
-        console.log("Committing batch...");
-
-        // Add a timeout to prevent hanging indefinitely
+        // Add a timeout to prevent hanging
         const timeout = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Request timed out. Check your network or Firewall rules.")), 10000)
+            setTimeout(() => reject(new Error("Request timed out.")), 10000)
         );
 
         await Promise.race([batch.commit(), timeout]);
-
         console.log("Data uploaded successfully!");
     } catch (error) {
         console.error("Error uploading data: ", error);
@@ -97,6 +100,29 @@ export const updateMatch = async (matchId, updates) => {
         await setDoc(matchRef, updates, { merge: true });
     } catch (error) {
         console.error("Error updating match: ", error);
+        throw error;
+    }
+};
+
+export const resetTournamentData = async () => {
+    try {
+        console.log("Starting full reset...");
+        const batch = writeBatch(db);
+
+        // 1. Get all documents
+        const matchesSnapshot = await getDocs(collection(db, COLLECTIONS.MATCHES));
+        const teamsSnapshot = await getDocs(collection(db, COLLECTIONS.TEAMS));
+        const groupsSnapshot = await getDocs(collection(db, COLLECTIONS.GROUPS));
+
+        // 2. Delete all
+        matchesSnapshot.forEach((doc) => { batch.delete(doc.ref); });
+        teamsSnapshot.forEach((doc) => { batch.delete(doc.ref); });
+        groupsSnapshot.forEach((doc) => { batch.delete(doc.ref); });
+
+        await batch.commit();
+        console.log("All data reset successfully!");
+    } catch (error) {
+        console.error("Error resetting data: ", error);
         throw error;
     }
 };
