@@ -20,7 +20,8 @@ const db = getFirestore(app);
 const COLLECTIONS = {
     MATCHES: "tennis_matches",
     TEAMS: "tennis_teams",
-    GROUPS: "tennis_groups"
+    GROUPS: "tennis_groups",
+    COURTS: "tennis_courts"
 };
 
 export const subscribeToData = (onDataUpdate) => {
@@ -53,10 +54,21 @@ export const subscribeToData = (onDataUpdate) => {
         }
     });
 
+    const unsubscribeCourts = onSnapshot(collection(db, COLLECTIONS.COURTS), (snapshot) => {
+        const courts = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+        const sortedCourts = courts.sort((a, b) => Number(a.id) - Number(b.id));
+        if (courts.length > 0) {
+            onDataUpdate(prev => ({ ...prev, courts: sortedCourts }));
+        } else {
+            onDataUpdate(prev => ({ ...prev, courts: [] }));
+        }
+    });
+
     return () => {
         unsubscribeMatches();
         unsubscribeTeams();
         unsubscribeGroups();
+        unsubscribeCourts();
     };
 };
 
@@ -80,6 +92,13 @@ export const uploadData = async (data) => {
             const ref = doc(db, COLLECTIONS.MATCHES, match.id);
             batch.set(ref, match);
         });
+
+        if (cleanData.courts) {
+            cleanData.courts.forEach(court => {
+                const ref = doc(db, COLLECTIONS.COURTS, String(court.id));
+                batch.set(ref, court);
+            });
+        }
 
         // Add a timeout to prevent hanging
         const timeout = new Promise((_, reject) =>
@@ -113,11 +132,13 @@ export const resetTournamentData = async () => {
         const matchesSnapshot = await getDocs(collection(db, COLLECTIONS.MATCHES));
         const teamsSnapshot = await getDocs(collection(db, COLLECTIONS.TEAMS));
         const groupsSnapshot = await getDocs(collection(db, COLLECTIONS.GROUPS));
+        const courtsSnapshot = await getDocs(collection(db, COLLECTIONS.COURTS));
 
         // 2. Delete all
         matchesSnapshot.forEach((doc) => { batch.delete(doc.ref); });
         teamsSnapshot.forEach((doc) => { batch.delete(doc.ref); });
         groupsSnapshot.forEach((doc) => { batch.delete(doc.ref); });
+        courtsSnapshot.forEach((doc) => { batch.delete(doc.ref); });
 
         await batch.commit();
         console.log("All data reset successfully!");
