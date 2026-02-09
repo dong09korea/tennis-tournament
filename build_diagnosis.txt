@@ -4,9 +4,9 @@
 
 [36mvite v5.4.21 [32mbuilding for production...[36m[39m
 transforming...
-[32m??[39m 15 modules transformed.
+[32m??[39m 7 modules transformed.
 node.exe : [31mx[39m Buil
-d failed in 99ms
+d failed in 78ms
 위치 줄:1 문자:1
 + & "C:\Program Files\nodej
 s/node.exe" "C:\Program Fil
@@ -17,7 +17,7 @@ es\nodejs/node_mo ...
     + CategoryInfo         
      : NotSpecified: ([3  
   1mx[39m Build failed    
- in 99ms:String) [], Re    
+ in 78ms:String) [], Re    
 moteException
     + FullyQualifiedErrorI 
    d : NativeCommandError

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
-import Bracket from './components/Bracket';
+import Bracket from './components/BracketFixed';
 import Standings from './components/Standings';
 import AdminDashboard from './components/AdminDashboard';
 import initialData from './assets/data.json';
