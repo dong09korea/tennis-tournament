@@ -9,20 +9,7 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
           <h1>WIMBLEDON LIVE</h1>
         </div>
 
-        <button
-          onClick={onToggleAdmin}
-          style={{
-            background: 'none',
-            border: 'none',
-            cursor: 'pointer',
-            padding: '5px',
-            opacity: 0.5,
-            transition: 'all 0.3s'
-          }}
-          title={isAdmin ? "Exit Admin Mode" : "Admin Mode"}
-        >
-          {isAdmin ? <Unlock size={20} color="#ff4444" /> : <Lock size={20} color="#666" />}
-        </button>
+
       </header>
 
       <nav className="tab-nav">

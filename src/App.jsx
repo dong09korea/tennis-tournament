@@ -46,24 +46,31 @@ function App() {
             }}
         >
             {/* Admin Controls (Floating DB Init Button - Only show if Admin AND not in Dashboard) */}
-            {isAdmin && activeTab !== 'admin' && (
+            {/* Floating Controls (Show on non-admin tabs) */}
+            {activeTab !== 'admin' && (
                 <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
                     {status && <div style={{ background: 'rgba(0,0,0,0.8)', color: 'white', padding: '10px', borderRadius: '8px' }}>{status}</div>}
-                    <button
-                        onClick={handleUpload}
-                        style={{
-                            padding: '10px 15px',
-                            background: '#d32f2f',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            opacity: 0.9,
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.3)'
-                        }}
-                    >
-                        DB 초기화 (주의)
-                    </button>
+
+                    {/* DB Reset - Only for Admins */}
+                    {isAdmin && (
+                        <button
+                            onClick={handleUpload}
+                            style={{
+                                padding: '10px 15px',
+                                background: '#d32f2f',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                opacity: 0.9,
+                                boxShadow: '0 2px 5px rgba(0,0,0,0.3)'
+                            }}
+                        >
+                            DB 초기화 (주의)
+                        </button>
+                    )}
+
+                    {/* Operator Mode - Always visible */}
                     <button
                         onClick={() => setActiveTab('admin')}
                         style={{
@@ -77,7 +84,7 @@ function App() {
                             boxShadow: '0 2px 5px rgba(0,0,0,0.3)'
                         }}
                     >
-                        ⚙️ 설정 페이지
+                        ⚙️ 운영자 모드
                     </button>
                 </div>
             )}
