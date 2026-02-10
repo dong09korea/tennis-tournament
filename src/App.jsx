@@ -8,10 +8,20 @@ import initialData from './assets/data.json';
 import { subscribeToData, uploadData } from './services/firebase';
 
 function App() {
-    const [activeTab, setActiveTab] = useState('match');
+    // Initialize state from localStorage if available
+    const [activeTab, setActiveTab] = useState(() => localStorage.getItem('activeTab') || 'match');
     const [data, setData] = useState(initialData);
     const [status, setStatus] = useState("");
-    const [isAdmin, setIsAdmin] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('isAdmin') === 'true');
+
+    // Persist state changes
+    useEffect(() => {
+        localStorage.setItem('activeTab', activeTab);
+    }, [activeTab]);
+
+    useEffect(() => {
+        localStorage.setItem('isAdmin', isAdmin);
+    }, [isAdmin]);
 
     useEffect(() => {
         const unsubscribe = subscribeToData(setData);
