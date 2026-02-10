@@ -263,23 +263,34 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                                 <div className="form-section">
                                     <div className="input-group">
                                         <label>조(Group) 개수</label>
-                                        <input
-                                            type="number"
-                                            className="modern-input"
-                                            value={numGroups}
-                                            onChange={(e) => {
-                                                const val = Number(e.target.value);
-                                                setNumGroups(val);
-                                                if (val > 0 && 48 % val === 0) {
-                                                    const perGroup = 48 / val;
-                                                    const newGrid = gridData.map((row, idx) => ({
-                                                        ...row,
-                                                        group: `${Math.floor(idx / perGroup) + 1}조`
-                                                    }));
-                                                    setGridData(newGrid);
-                                                }
-                                            }}
-                                        />
+                                        <div style={{ display: 'flex', gap: '10px' }}>
+                                            <input
+                                                type="number"
+                                                className="modern-input"
+                                                value={numGroups}
+                                                onChange={(e) => setNumGroups(Number(e.target.value))}
+                                            />
+                                            <button
+                                                className="modern-button secondary"
+                                                onClick={() => {
+                                                    if (numGroups <= 0 || 48 % numGroups !== 0) {
+                                                        alert("48팀을 균등하게 나눌 수 있는 조 개수를 입력해주세요. (예: 4, 6, 8, 12, 16, 24)");
+                                                        return;
+                                                    }
+                                                    if (confirm(`${numGroups}개 조로 자동 배정하시겠습니까? (기존 조 정보는 덮어씌워집니다)`)) {
+                                                        const perGroup = 48 / numGroups;
+                                                        const newGrid = gridData.map((row, idx) => ({
+                                                            ...row,
+                                                            group: `${Math.floor(idx / perGroup) + 1}조`
+                                                        }));
+                                                        setGridData(newGrid);
+                                                        alert("조 배정이 완료되었습니다. [참가자 명단] 탭에서 확인하세요.");
+                                                    }
+                                                }}
+                                            >
+                                                ⚡ 조 자동 배정
+                                            </button>
+                                        </div>
                                         <p className="field-hint">전체 참가팀을 나눌 조의 개수입니다.</p>
                                     </div>
                                     <div className="input-group" style={{ marginTop: '1.5rem' }}>
@@ -297,6 +308,27 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                                 <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <h3><span className="icon-gap">📋</span> 참가자 명단 입력 (48팀)</h3>
                                     <div className="excel-actions">
+                                        <button
+                                            className="mini-btn"
+                                            style={{ backgroundColor: '#9c27b0', color: 'white' }}
+                                            onClick={() => {
+                                                if (numGroups <= 0 || 48 % numGroups !== 0) {
+                                                    alert("48팀을 균등하게 나눌 수 있는 조 개수를 입력해주세요. (예: 4, 6, 8, 12, 16, 24)");
+                                                    return;
+                                                }
+                                                if (confirm(`${numGroups}개 조로 자동 배정하시겠습니까? (기존 조 정보는 덮어씌워집니다)`)) {
+                                                    const perGroup = 48 / numGroups;
+                                                    const newGrid = gridData.map((row, idx) => ({
+                                                        ...row,
+                                                        group: `${Math.floor(idx / perGroup) + 1}조`
+                                                    }));
+                                                    setGridData(newGrid);
+                                                    alert("조 배정이 완료되었습니다.");
+                                                }
+                                            }}
+                                        >
+                                            ⚡ 조 자동 배정 ({numGroups}개)
+                                        </button>
                                         <button onClick={handleExcelDownload} className="mini-btn success">📥 엑셀 양식 다운</button>
                                         <label className="mini-btn info" style={{ cursor: 'pointer' }}>
                                             📤 엑셀 업로드
