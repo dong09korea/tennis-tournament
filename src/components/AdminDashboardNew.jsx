@@ -263,7 +263,23 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                                 <div className="form-section">
                                     <div className="input-group">
                                         <label>조(Group) 개수</label>
-                                        <input type="number" className="modern-input" value={numGroups} onChange={(e) => setNumGroups(Number(e.target.value))} />
+                                        <input
+                                            type="number"
+                                            className="modern-input"
+                                            value={numGroups}
+                                            onChange={(e) => {
+                                                const val = Number(e.target.value);
+                                                setNumGroups(val);
+                                                if (val > 0 && 48 % val === 0) {
+                                                    const perGroup = 48 / val;
+                                                    const newGrid = gridData.map((row, idx) => ({
+                                                        ...row,
+                                                        group: `${Math.floor(idx / perGroup) + 1}조`
+                                                    }));
+                                                    setGridData(newGrid);
+                                                }
+                                            }}
+                                        />
                                         <p className="field-hint">전체 참가팀을 나눌 조의 개수입니다.</p>
                                     </div>
                                     <div className="input-group" style={{ marginTop: '1.5rem' }}>
