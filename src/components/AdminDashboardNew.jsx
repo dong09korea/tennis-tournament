@@ -268,7 +268,18 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                                                 type="number"
                                                 className="modern-input"
                                                 value={numGroups}
-                                                onChange={(e) => setNumGroups(Number(e.target.value))}
+                                                onChange={(e) => {
+                                                    const val = Number(e.target.value);
+                                                    setNumGroups(val);
+                                                    if (val > 0 && 48 % val === 0) {
+                                                        const perGroup = 48 / val;
+                                                        const newGrid = gridData.map((row, idx) => ({
+                                                            ...row,
+                                                            group: `${Math.floor(idx / perGroup) + 1}조`
+                                                        }));
+                                                        setGridData(newGrid);
+                                                    }
+                                                }}
                                             />
                                             <button
                                                 className="modern-button secondary"
