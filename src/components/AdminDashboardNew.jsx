@@ -5,6 +5,7 @@ import * as XLSX from 'xlsx';
 
 const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
     // Local State
+    const [numTeams, setNumTeams] = useState(48); // Default 48 Teams
     const [numGroups, setNumGroups] = useState(8); // Default 8 Groups
     const [numCourts, setNumCourts] = useState(10);
     const [password, setPassword] = useState("");
@@ -12,7 +13,7 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
     const [isProcessing, setIsProcessing] = useState(false);
     const [activeTab, setActiveTab] = useState('settings'); // 'settings' | 'grouping'
 
-    // Grid State: 48 Rows
+    // Grid State: numTeams Rows
     const [gridData, setGridData] = useState(
         Array.from({ length: 48 }, (_, i) => ({
             id: i,
@@ -27,6 +28,26 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
             total_score: ''
         }))
     );
+
+    // Update grid when numTeams changes
+    useEffect(() => {
+        setGridData(prev => {
+            if (prev.length === numTeams) return prev;
+            if (prev.length < numTeams) {
+                // Add rows
+                const added = Array.from({ length: numTeams - prev.length }, (_, i) => ({
+                    id: prev.length + i,
+                    group: '',
+                    club: '',
+                    ...{ p1_name: '', p1_gender: '', p1_score: '', p2_name: '', p2_gender: '', p2_score: '', total_score: '' }
+                }));
+                return [...prev, ...added];
+            } else {
+                // Remove rows (slice)
+                return prev.slice(0, numTeams);
+            }
+        });
+    }, [numTeams]);
 
     const handleLogin = (e) => {
         e.preventDefault();
@@ -74,7 +95,7 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
             // Start from row 1 (index 1) if header exists. Let's assume header exists.
             let gridIdx = 0;
             for (let i = 1; i < data.length; i++) {
-                if (gridIdx >= 48) break;
+                if (gridIdx >= numTeams) break;
                 const row = data[i];
                 if (!row || row.length === 0) continue;
 
@@ -165,8 +186,8 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
 
     // --- Smart Assign Logic ---
     const handleSmartAssign = () => {
-        if (numGroups <= 0 || 48 % numGroups !== 0) {
-            alert("48팀을 균등하게 나눌 수 있는 조 개수를 입력해주세요. (예: 4, 6, 8, 12, 16, 24)");
+        if (numGroups <= 0 || numTeams % numGroups !== 0) {
+            alert(`${numTeams}팀을 균등하게 나눌 수 있는 조 개수를 입력해주세요.`);
             return;
         }
 
@@ -193,7 +214,7 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
         // Rule: Avoid group where a team from same 'club' exists (if possible).
         // Rule: Balance group sizes (Snake order helps, but we enforce size limit).
 
-        const teamsPerGroup = 48 / numGroups;
+        const teamsPerGroup = numTeams / numGroups;
 
         validTeams.forEach((team, i) => {
             // Determine snake direction based on round
@@ -358,8 +379,8 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                                                 onChange={(e) => {
                                                     const val = Number(e.target.value);
                                                     setNumGroups(val);
-                                                    if (val > 0 && 48 % val === 0) {
-                                                        const perGroup = 48 / val;
+                                                    if (val > 0 && numTeams % val === 0) {
+                                                        const perGroup = numTeams / val;
                                                         const newGrid = gridData.map((row, idx) => ({
                                                             ...row,
                                                             group: `${Math.floor(idx / perGroup) + 1}조`
@@ -391,7 +412,7 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                         {activeTab === 'grouping' && (
                             <div className="tab-content fade-in">
                                 <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <h3><span className="icon-gap">📋</span> 참가자 명단 입력 (48팀)</h3>
+                                    <h3><span className="icon-gap">📋</span> 참가자 명단 입력 ({numTeams}팀)</h3>
                                     <div className="excel-actions">
                                         <button
                                             className="mini-btn"
