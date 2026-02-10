@@ -370,6 +370,11 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                                 </div>
                                 <div className="form-section">
                                     <div className="input-group">
+                                        <label>참가 팀 수</label>
+                                        <input type="number" className="modern-input" value={numTeams} onChange={(e) => setNumTeams(Number(e.target.value))} />
+                                        <p className="field-hint">전체 참가팀의 수입니다. (기본 48팀)</p>
+                                    </div>
+                                    <div className="input-group" style={{ marginTop: '1.5rem' }}>
                                         <label>조(Group) 개수</label>
                                         <div style={{ display: 'flex', gap: '10px' }}>
                                             <input
