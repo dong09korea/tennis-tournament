@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Layout from './components/Layout';
 import Bracket from './components/BracketFixed';
 import Standings from './components/Standings';
-import AdminDashboard from './components/AdminDashboard';
+import AdminDashboard from './components/AdminDashboardNew';
 import initialData from './assets/data.json';
 
 import { subscribeToData, uploadData } from './services/firebase';
@@ -45,32 +45,10 @@ function App() {
                 }
             }}
         >
-            {/* Admin Controls (Floating DB Init Button - Only show if Admin AND not in Dashboard) */}
-            {/* Floating Controls (Show on non-admin tabs) */}
+            {/* Operator Mode - Always visible */}
+            {/* Operator Mode - Moved to AdminDashboard */}
             {activeTab !== 'admin' && (
-                <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '10px' }}>
-                    {status && <div style={{ background: 'rgba(0,0,0,0.8)', color: 'white', padding: '10px', borderRadius: '8px' }}>{status}</div>}
-
-                    {/* DB Reset - Only for Admins */}
-                    {isAdmin && (
-                        <button
-                            onClick={handleUpload}
-                            style={{
-                                padding: '10px 15px',
-                                background: '#d32f2f',
-                                color: 'white',
-                                border: 'none',
-                                borderRadius: '8px',
-                                cursor: 'pointer',
-                                opacity: 0.9,
-                                boxShadow: '0 2px 5px rgba(0,0,0,0.3)'
-                            }}
-                        >
-                            DB 초기화 (주의)
-                        </button>
-                    )}
-
-                    {/* Operator Mode - Always visible */}
+                <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999 }}>
                     <button
                         onClick={() => setActiveTab('admin')}
                         style={{
@@ -84,8 +62,9 @@ function App() {
                             boxShadow: '0 2px 5px rgba(0,0,0,0.3)'
                         }}
                     >
-                        ⚙️ 운영자 모드
+                        🔐 운영자 로그인
                     </button>
+                    {/* DB Reset Removed - Access inside Admin Dashboard */}
                 </div>
             )}
 

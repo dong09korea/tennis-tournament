@@ -1,53 +1,205 @@
-import React from 'react';
+import React, { useState } from 'react';
 
 const Standings = ({ teams, groups }) => {
-  // Group teams by group ID (based on pre_group or new group logic? JSON has 'groups' array)
-  // The JSON structure has 'groups' array with 'team_ids'.
+  const [viewMode, setViewMode] = useState('rankings'); // 'rankings' | 'roster'
 
-  return (
-    <div className="standings-container">
-      {groups.map(group => {
-        const groupTeams = group.team_ids.map(tid => teams.find(t => t.id === tid)).filter(Boolean);
-        // Sort by points (desc), then goal diff if needed.
-        // Assuming 'points' is already calculated in the data for now.
-        // Or we could recalculate. For viewer, use data as is.
-        const sortedTeams = [...groupTeams].sort((a, b) => b.points - a.points || b.games_won - a.games_won);
+  // --- Roster View ---
+  if (viewMode === 'roster') {
+    return (
+      <div className="standings-container">
+        <div className="view-toggle">
+          <button onClick={() => setViewMode('rankings')} className="toggle-btn">📊 조별 순위</button>
+          <button onClick={() => setViewMode('roster')} className="toggle-btn active">📋 참가자 명단</button>
+        </div>
 
-        return (
-          <div key={group.id} className="group-card">
-            <h3 className="group-title">{group.name}</h3>
-            <table className="standings-table">
+        <div className="glass-card full-width">
+          <div className="table-responsive">
+            <table className="roster-table">
               <thead>
                 <tr>
-                  <th>Rank</th>
-                  <th>Team</th>
-                  <th>P</th>
-                  <th>W</th>
-                  <th>L</th>
-                  <th>Pts</th>
+                  <th>클럽</th>
+                  <th>이름(1)</th>
+                  <th>성별</th>
+                  <th>점수</th>
+                  <th>이름(2)</th>
+                  <th>성별</th>
+                  <th>점수</th>
+                  <th>합계</th>
+                  <th>조</th>
                 </tr>
               </thead>
               <tbody>
-                {sortedTeams.map((team, index) => (
+                {teams.map(team => (
                   <tr key={team.id}>
-                    <td>{index + 1}</td>
-                    <td className="team-cell">
-                      <div className="t-name">{team.name}</div>
+                    <td>{team.club || '-'}</td>
+                    <td>{team.player1}</td>
+                    <td>{team.p1_gender || '-'}</td>
+                    <td>{team.p1_score || '-'}</td>
+                    <td>{team.player2}</td>
+                    <td>{team.p2_gender || '-'}</td>
+                    <td>{team.p2_score || '-'}</td>
+                    <td className="highlight">{team.total_score || '-'}</td>
+                    <td>
+                      {/* Find Group Name */}
+                      {groups.find(g => g.team_ids.includes(team.id))?.name || '-'}
                     </td>
-                    <td>{team.wins + team.losses + team.draws}</td>
-                    <td>{team.wins}</td>
-                    <td>{team.losses}</td>
-                    <td className="points">{team.points}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        );
-      })}
+        </div>
+
+        <style>{`
+            .standings-container {
+                max-width: 1200px;
+                margin: 0 auto;
+            }
+            .view-toggle {
+                display: flex;
+                gap: 10px;
+                margin-bottom: 1.5rem;
+                justify-content: center;
+            }
+            .toggle-btn {
+                padding: 0.8rem 1.5rem;
+                background: rgba(255,255,255,0.1);
+                border: 1px solid rgba(255,255,255,0.2);
+                color: #aaa;
+                border-radius: 20px;
+                cursor: pointer;
+                transition: all 0.2s;
+            }
+            .toggle-btn.active {
+                background: var(--tennis-yellow);
+                color: black;
+                font-weight: bold;
+                border-color: var(--tennis-yellow);
+            }
+            
+            .glass-card {
+                background: rgba(30,30,30,0.6);
+                backdrop-filter: blur(10px);
+                border-radius: 12px;
+                padding: 1rem;
+                border: 1px solid rgba(255,255,255,0.05);
+            }
+
+            .table-responsive {
+                overflow-x: auto;
+            }
+
+            .roster-table {
+                width: 100%;
+                border-collapse: collapse;
+                min-width: 800px; /* Force scroll on mobile */
+                font-size: 0.9rem;
+            }
+            .roster-table th {
+                background: rgba(0,0,0,0.3);
+                padding: 1rem;
+                text-align: center;
+                color: var(--tennis-yellow);
+                border-bottom: 2px solid rgba(255,255,255,0.1);
+                white-space: nowrap;
+            }
+            .roster-table td {
+                padding: 0.8rem;
+                text-align: center;
+                border-bottom: 1px solid rgba(255,255,255,0.05);
+                color: #ddd;
+            }
+            .roster-table tr:hover {
+                background: rgba(255,255,255,0.05);
+            }
+            .highlight {
+                color: var(--tennis-yellow);
+                font-weight: bold;
+            }
+        `}</style>
+      </div>
+    );
+  }
+
+  // --- Rankings View (Original) ---
+  return (
+    <div className="standings-container">
+      <div className="view-toggle">
+        <button onClick={() => setViewMode('rankings')} className="toggle-btn active">📊 조별 순위</button>
+        <button onClick={() => setViewMode('roster')} className="toggle-btn">📋 참가자 명단</button>
+      </div>
+
+      <div className="rankings-grid">
+        {groups.map(group => {
+          const groupTeams = group.team_ids.map(tid => teams.find(t => t.id === tid)).filter(Boolean);
+          // Sort by points (desc), then goal diff if needed.
+          // Assuming 'points' is already calculated in the data for now.
+          // Or we could recalculate. For viewer, use data as is.
+          const sortedTeams = [...groupTeams].sort((a, b) => b.points - a.points || b.games_won - a.games_won);
+
+          return (
+            <div key={group.id} className="group-card">
+              <h3 className="group-title">{group.name}</h3>
+              <table className="standings-table">
+                <thead>
+                  <tr>
+                    <th>Rank</th>
+                    <th>Team</th>
+                    <th>P</th>
+                    <th>W</th>
+                    <th>L</th>
+                    <th>Pts</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sortedTeams.map((team, index) => (
+                    <tr key={team.id}>
+                      <td>{index + 1}</td>
+                      <td className="team-cell">
+                        <div className="t-name">{team.name}</div>
+                      </td>
+                      <td>{team.wins + team.losses + team.draws}</td>
+                      <td>{team.wins}</td>
+                      <td>{team.losses}</td>
+                      <td className="points">{team.points}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
+      </div>
 
       <style>{`
+        /* Shared Toggle Styles */
+        .view-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 1.5rem;
+            justify-content: center;
+        }
+        .toggle-btn {
+            padding: 0.8rem 1.5rem;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #aaa;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .toggle-btn.active {
+            background: var(--tennis-yellow);
+            color: black;
+            font-weight: bold;
+            border-color: var(--tennis-yellow);
+        }
+
         .standings-container {
+             /* Wrapper */
+        }
+
+        .rankings-grid {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
           gap: 1.5rem;
@@ -103,7 +255,7 @@ const Standings = ({ teams, groups }) => {
 
         /* Mobile Styles */
         @media (max-width: 768px) {
-          .standings-container {
+          .rankings-grid {
             grid-template-columns: 1fr;
           }
           .t-name {

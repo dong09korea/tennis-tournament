@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { generateGroups, generateSchedule, assignMatchesToCourts } from '../utils/tournamentLogic';
 import { uploadData, updateMatch, resetTournamentData } from '../services/firebase';
-import { Users, Settings, PlayCircle, RefreshCcw, Trash2, CheckCircle, AlertTriangle, LogIn } from 'lucide-react';
 
-const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
+const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
     // Local State
     const [teamInput, setTeamInput] = useState("");
     const [numGroups, setNumGroups] = useState(8);
@@ -11,6 +10,7 @@ const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
     const [password, setPassword] = useState("");
     const [statusMsg, setStatusMsg] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
+    const [activeTab, setActiveTab] = useState('settings'); // 'settings' | 'grouping'
 
     const handleLogin = (e) => {
         e.preventDefault();
@@ -32,13 +32,67 @@ const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
 
         try {
             // Parse Teams
-            const teamNames = teamInput.split('\n').filter(n => n.trim());
-            const teams = teamNames.map((name, idx) => ({
-                id: `t${idx + 1}`,
-                name: name.trim(),
-                player1: "",
-                player2: ""
-            }));
+            const lines = teamInput.split('\n').filter(n => n.trim());
+            const teams = lines.map((line, idx) => {
+                // Check if line has tab or multiple spaces (Extended Format)
+                // Expected: "Club P1Name P1Gender P1Score P2Name P2Gender P2Score TotalScore Group"
+                // Delimiter: Space or Tab
+                const parts = line.trim().split(/\s+/);
+
+                if (parts.length >= 8) {
+                    // Try to map extended format
+                    // Depending on EXACT columns. User said:
+                    // Club, P1, Gender, Score, P2, Gender, Score, Total, Group (9 parts)
+                    // But maybe names have spaces? Let's assume compact names for now.
+
+                    // Simple heuristic: if parts >= 8, treat as robust data
+                    // 0: Club
+                    // 1: P1 Name
+                    // 2: P1 Gender
+                    // 3: P1 Score
+                    // 4: P2 Name
+                    // 5: P2 Gender
+                    // 6: P2 Score
+                    // 7: Total Score
+                    // 8: Group (Optional?)
+
+                    const club = parts[0];
+                    const p1 = parts[1];
+                    const p1g = parts[2];
+                    const p1s = parts[3];
+                    const p2 = parts[4];
+                    const p2g = parts[5];
+                    const p2s = parts[6];
+                    const total = parts[7];
+                    const group = parts[8] || null; // Might be undefined
+
+                    return {
+                        id: `t${idx + 1}`,
+                        name: `${p1}/${p2}`, // Display Name
+                        player1: p1,
+                        player2: p2,
+                        club: club,
+                        p1_gender: p1g,
+                        p1_score: p1s,
+                        p2_gender: p2g,
+                        p2_score: p2s,
+                        total_score: total,
+                        initial_group: group
+                    };
+                } else {
+                    // Fallback to simple name
+                    const name = line.trim();
+                    const players = name.split('/');
+                    return {
+                        id: `t${idx + 1}`,
+                        name: name,
+                        player1: players[0] || "",
+                        player2: players[1] || "",
+                        club: "",
+                        initial_group: null
+                    };
+                }
+            });
 
             if (teams.length < numGroups) {
                 if (!confirm(`팀 수(${teams.length})가 조 개수(${numGroups})보다 적습니다.계속 진행할까요?`)) {
@@ -109,7 +163,7 @@ const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
             <div className="login-container glass-panel">
                 <div className="login-box">
                     <div className="icon-wrapper">
-                        <Settings size={48} color="var(--tennis-yellow)" />
+                        <span style={{ fontSize: '48px' }}>⚙️</span>
                     </div>
                     <h2>운영자 로그인</h2>
                     <p>대회 설정을 위해 관리자 권한이 필요합니다.</p>
@@ -124,7 +178,7 @@ const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
                             autoFocus
                         />
                         <button type="submit" className="modern-button primary full-width">
-                            <LogIn size={18} /> 로그인
+                            🔑 로그인
                         </button>
                     </form>
                 </div>
@@ -173,65 +227,104 @@ const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
     return (
         <div className="dashboard-container">
             <div className="dashboard-header">
-                <h2><Settings className="icon-gap" /> 대회 운영 대시보드</h2>
+                <h2><span className="icon-gap">⚙️</span> 대회 운영 대시보드</h2>
                 <div className="status-badge">
                     {isProcessing ? "🔄 처리 중..." : "✅ 시스템 준비됨"}
                 </div>
             </div>
 
             <div className="dashboard-grid">
-                {/* LEFT COLUMN: SETUP */}
-                <div className="glass-card setup-card">
-                    <div className="card-header">
-                        <h3><Users className="icon-gap" /> 참가자 및 조 편성</h3>
+                {/* LEFT COLUMN: SETUP & TABS */}
+                <div className="left-col">
+                    {/* Tabs */}
+                    <div className="tab-navigation">
+                        <button
+                            className={`tab-btn ${activeTab === 'settings' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('settings')}
+                        >
+                            ⚙️ 대회 운영 설정
+                        </button>
+                        <button
+                            className={`tab-btn ${activeTab === 'grouping' ? 'active' : ''}`}
+                            onClick={() => setActiveTab('grouping')}
+                        >
+                            👥 조 편성
+                        </button>
                     </div>
 
-                    <div className="form-section">
-                        <label>참가 팀 명단 (한 줄에 한 팀)</label>
-                        <textarea
-                            className="modern-textarea"
-                            placeholder={"홍길동/이순신\n김철수/박영희\nTeam A\nTeam B"}
-                            value={teamInput}
-                            onChange={(e) => setTeamInput(e.target.value)}
-                        />
-                        <div className="input-row">
-                            <div className="input-group">
-                                <label>조(Group) 개수</label>
-                                <input
-                                    type="number"
-                                    className="modern-input"
-                                    value={numGroups}
-                                    onChange={(e) => setNumGroups(Number(e.target.value))}
-                                />
-                            </div>
-                            <div className="input-group">
-                                <label>코트(Court) 개수</label>
-                                <input
-                                    type="number"
-                                    className="modern-input"
-                                    value={numCourts}
-                                    onChange={(e) => setNumCourts(Number(e.target.value))}
-                                />
-                            </div>
-                        </div>
+                    <div className="glass-card setup-card">
+                        {/* TAB 1: SETTINGS */}
+                        {activeTab === 'settings' && (
+                            <div className="tab-content fade-in">
+                                <div className="card-header">
+                                    <h3><span className="icon-gap">⚙️</span> 환경 설정</h3>
+                                </div>
+                                <div className="form-section">
+                                    <div className="input-group">
+                                        <label>조(Group) 개수</label>
+                                        <input
+                                            type="number"
+                                            className="modern-input"
+                                            value={numGroups}
+                                            onChange={(e) => setNumGroups(Number(e.target.value))}
+                                        />
+                                        <p className="field-hint">전체 참가팀을 나눌 조의 개수입니다.</p>
+                                    </div>
+                                    <div className="input-group" style={{ marginTop: '1.5rem' }}>
+                                        <label>코트(Court) 개수</label>
+                                        <input
+                                            type="number"
+                                            className="modern-input"
+                                            value={numCourts}
+                                            onChange={(e) => setNumCourts(Number(e.target.value))}
+                                        />
+                                        <p className="field-hint">운영할 테니스 코트의 총 개수입니다.</p>
+                                    </div>
 
-                        <div className="action-buttons">
-                            <button
-                                onClick={handleGenerate}
-                                disabled={isProcessing}
-                                className="modern-button primary"
-                            >
-                                <PlayCircle size={18} /> 대진표 생성 및 시작
-                            </button>
+                                    <div className="info-box">
+                                        <span>⚠️</span>
+                                        <span>이 설정은 [대진표 생성] 시 적용됩니다.</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-                            <button
-                                onClick={handleReset}
-                                disabled={isProcessing}
-                                className="modern-button danger"
-                            >
-                                <Trash2 size={18} /> 대회 초기화
-                            </button>
-                        </div>
+                        {/* TAB 2: GROUPING */}
+                        {activeTab === 'grouping' && (
+                            <div className="tab-content fade-in">
+                                <div className="card-header">
+                                    <h3><span className="icon-gap">👥</span> 참가자 명단</h3>
+                                </div>
+                                <div className="form-section">
+                                    <label>참가 팀 입력 (한 줄에 한 팀)</label>
+                                    <textarea
+                                        className="modern-textarea"
+                                        placeholder={"예시 1 (간편):\n홍길동/이순신\n김철수/박영희\n\n예시 2 (상세 - 띄어쓰기 구분):\n클럽명 1참가자 남 4.0 2참가자 여 3.0 7.0 1\n(클럽, 이름1, 성별, 점수, 이름2, 성별, 점수, 합계, 조)"}
+                                        value={teamInput}
+                                        onChange={(e) => setTeamInput(e.target.value)}
+                                    />
+
+                                    <div className="action-buttons">
+                                        <button
+                                            onClick={handleGenerate}
+                                            disabled={isProcessing}
+                                            className="modern-button primary"
+                                        >
+                                            ▶️ 대진표 생성 및 시작
+                                        </button>
+
+                                        <button
+                                            onClick={handleReset}
+                                            disabled={isProcessing}
+                                            className="modern-button danger"
+                                        >
+                                            🗑️ 대회 초기화
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
                         {statusMsg && <div className="status-message">{statusMsg}</div>}
                     </div>
                 </div>
@@ -240,7 +333,7 @@ const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
                 <div className="right-col">
                     <div className="glass-card status-card">
                         <div className="card-header">
-                            <h3><CheckCircle className="icon-gap" /> 현재 상태</h3>
+                            <h3><span className="icon-gap">✅</span> 현재 상태</h3>
                         </div>
                         <div className="stat-grid">
                             <div className="stat-item">
@@ -260,7 +353,7 @@ const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
 
                     <div className="glass-card control-card">
                         <div className="card-header">
-                            <h3><RefreshCcw className="icon-gap" /> 경기 배정</h3>
+                            <h3><span className="icon-gap">⚡</span> 경기 배정</h3>
                         </div>
                         <p className="card-desc">
                             빈 코트가 생기면 대기 중인 경기를 자동으로 배정합니다.
@@ -276,12 +369,12 @@ const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
 
                     <div className="glass-card help-card">
                         <div className="card-header">
-                            <h3><AlertTriangle className="icon-gap" /> 관리자 가이드</h3>
+                            <h3><span className="icon-gap">ℹ️</span> 관리자 가이드</h3>
                         </div>
                         <ul className="help-list">
-                            <li>• 참가자 명단을 입력하고 <strong>[생성]</strong>을 누르면 대회가 시작됩니다.</li>
-                            <li>• <strong>[대진표]</strong> 탭에서 경기 점수를 입력할 수 있습니다.</li>
-                            <li>• 경기가 끝나면 <strong>[자동 배정]</strong>을 눌러 다음 경기를 투입하세요.</li>
+                            <li>• <strong>[대회 운영 설정]</strong>에서 코트/조 개수를 정합니다.</li>
+                            <li>• <strong>[조 편성]</strong>에서 명단을 넣고 [생성]을 누르세요.</li>
+                            <li>• 대회가 진행되면 <strong>[자동 배정]</strong>을 적극 활용하세요.</li>
                         </ul>
                     </div>
                 </div>
@@ -328,6 +421,59 @@ const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
         grid-template-columns: 1fr;
     }
 }
+                
+                /* --- TAB STYLES --- */
+                .tab-navigation {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 1rem;
+}
+                .tab-btn {
+    padding: 0.8rem 1.2rem;
+    background: rgba(0,0,0,0.3);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #888;
+    border-radius: 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-weight: bold;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+}
+                .tab-btn:hover {
+    background: rgba(255,255,255,0.05);
+    color: white;
+}
+                .tab-btn.active {
+    background: var(--tennis-yellow);
+    color: black;
+    border-color: var(--tennis-yellow);
+    box-shadow: 0 0 15px rgba(213, 255, 0, 0.3);
+}
+                
+                .field-hint {
+    font-size: 0.85rem;
+    color: #666;
+    margin-top: 5px;
+}
+                .info-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,0.05);
+    padding: 1rem;
+    border-radius: 8px;
+    margin-top: 2rem;
+    color: #aaa;
+    font-size: 0.9rem;
+}
+                
+                .fade-in {
+    animation: fadeIn 0.3s ease;
+}
+
 
                 .glass-card {
     background: rgba(30, 30, 30, 0.6);
@@ -480,10 +626,7 @@ const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
     margin: 0;
     color: #ccc;
     font-size: 0.9rem;
-}
-                .help-list li {
-    margin-bottom: 0.5rem;
-    line-height: 1.4;
+    line-height: 1.6;
 }
                 
                 .status-message {
@@ -506,4 +649,4 @@ const AdminDashboard = ({ data, onUpdateData, isAdmin, onLogin }) => {
     );
 };
 
-export default AdminDashboard;
+export default AdminDashboardNew;

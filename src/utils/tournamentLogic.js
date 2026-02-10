@@ -4,6 +4,7 @@
  */
 
 // Generate groups from a list of teams
+// Generate groups from a list of teams
 export const generateGroups = (teams, numGroups = 8) => {
     // initialize empty groups
     const groups = Array.from({ length: numGroups }, (_, i) => ({
@@ -12,10 +13,29 @@ export const generateGroups = (teams, numGroups = 8) => {
         team_ids: []
     }));
 
-    // Distribute teams (Round Robin)
+    // Distribute teams
     teams.forEach((team, index) => {
-        const groupIndex = index % numGroups;
-        groups[groupIndex].team_ids.push(team.id);
+        let groupIndex;
+
+        // If team has a pre-assigned group (1-based index or name)
+        if (team.initial_group) {
+            // Try to match '1', '1조', 'A' (mapped to 1?)
+            // Assuming input is number for now
+            const gId = parseInt(team.initial_group);
+            if (!isNaN(gId) && gId >= 1 && gId <= numGroups) {
+                groupIndex = gId - 1;
+            } else {
+                // Fallback or handle error? For now, Round Robin
+                groupIndex = index % numGroups;
+            }
+        } else {
+            // Round Robin
+            groupIndex = index % numGroups;
+        }
+
+        if (groups[groupIndex]) {
+            groups[groupIndex].team_ids.push(team.id);
+        }
     });
 
     return groups;

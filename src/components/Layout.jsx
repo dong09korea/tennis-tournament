@@ -1,15 +1,13 @@
-import { Trophy, Lock, Unlock } from 'lucide-react';
+import React from 'react';
 
 const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) => {
   return (
     <div className="layout-container">
       <header className="app-header">
         <div className="header-content">
-          <Trophy size={28} color="var(--tennis-yellow)" />
+          <span style={{ fontSize: '28px' }}>🏆</span>
           <h1>WIMBLEDON LIVE</h1>
         </div>
-
-
       </header>
 
       <nav className="tab-nav">
@@ -46,7 +44,7 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
           z-index: 100;
           backdrop-filter: blur(5px);
           display: flex;
-          justify-content: space-between;
+          justify-content: center;
           align-items: center;
         }
         .header-content {
