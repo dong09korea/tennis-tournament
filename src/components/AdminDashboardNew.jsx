@@ -163,6 +163,93 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
         }
     };
 
+    // --- Smart Assign Logic ---
+    const handleSmartAssign = () => {
+        if (numGroups <= 0 || 48 % numGroups !== 0) {
+            alert("48팀을 균등하게 나눌 수 있는 조 개수를 입력해주세요. (예: 4, 6, 8, 12, 16, 24)");
+            return;
+        }
+
+        if (!confirm(`${numGroups}개 조로 '스마트 배정' 하시겠습니까?\n(1. 점수순 시드 배정, 2. 클럽 중복 최소화)`)) {
+            return;
+        }
+
+        // 1. Get valid teams from grid
+        const validTeams = gridData.map((row, idx) => ({ ...row, originalIdx: idx })).filter(r => r.p1_name || r.club || r.total_score);
+
+        // 2. Sort by Total Score (Desc) for Seeding
+        // Treat empty score as 0
+        validTeams.sort((a, b) => {
+            const scoreA = parseFloat(a.total_score) || 0;
+            const scoreB = parseFloat(b.total_score) || 0;
+            return scoreB - scoreA;
+        });
+
+        // 3. Prepare Buckets
+        const groups = Array.from({ length: numGroups }, () => []);
+
+        // 4. Distribute (Snake Draft + Club Constraint)
+        // We iterate through teams. For each team, we find the best group.
+        // Rule: Avoid group where a team from same 'club' exists (if possible).
+        // Rule: Balance group sizes (Snake order helps, but we enforce size limit).
+
+        const teamsPerGroup = 48 / numGroups;
+
+        validTeams.forEach((team, i) => {
+            // Determine snake direction based on round
+            // Round 0 (0..numGroups-1): Forward
+            // Round 1 (numGroups..2*numGroups-1): Backward? 
+            // Actually, simplified balancing:
+            // Just find a group that is not full.
+
+            // Preferred groups: Not full AND No club conflict
+            let candidateGroups = groups.map((g, idx) => ({ id: idx, members: g, count: g.length }))
+                .filter(g => g.count < teamsPerGroup); // Must have space
+
+            // Try to filter by Club Conflict
+            const club = team.club ? team.club.trim() : "";
+            let bestGroups = candidateGroups;
+
+            if (club) {
+                const noConflictGroups = candidateGroups.filter(g => !g.members.some(m => m.club && m.club.trim() === club));
+                if (noConflictGroups.length > 0) {
+                    bestGroups = noConflictGroups;
+                }
+                // If noConflictGroups is empty, we MUST conflict (Pigeonhole). Fallback to candidateGroups.
+            }
+
+            // From bestGroups, pick the one with fewest members (to balance filling)
+            // If equal, picking random or sequential? 
+            // To simulate "Snake Seeding" behavior along with Club constraint is hard.
+            // Let's prioritize "Smallest size" first to keep them even.
+            bestGroups.sort((a, b) => a.count - b.count);
+
+            // If counts are equal, maybe use ID based on Snake?
+            // Simple approach: Just pick the first.
+
+            if (bestGroups.length > 0) {
+                groups[bestGroups[0].id].push(team);
+            } else {
+                // Should not happen if total teams <= 48
+                console.warn("No space left for team", team);
+            }
+        });
+
+        // 5. Update Grid
+        const newGrid = [...gridData];
+        groups.forEach((g, gIdx) => {
+            g.forEach(team => {
+                newGrid[team.originalIdx] = {
+                    ...newGrid[team.originalIdx],
+                    group: `${gIdx + 1}조`
+                };
+            });
+        });
+
+        setGridData(newGrid);
+        alert("✅ 스마트 배정 완료! (점수순 시드 + 클럽 분산)");
+    };
+
     const handleReset = async () => {
         if (confirm("정말로 모든 대회를 초기화하시겠습니까? (데이터 삭제됨)")) {
             setIsProcessing(true);
@@ -283,23 +370,10 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                                             />
                                             <button
                                                 className="modern-button secondary"
-                                                onClick={() => {
-                                                    if (numGroups <= 0 || 48 % numGroups !== 0) {
-                                                        alert("48팀을 균등하게 나눌 수 있는 조 개수를 입력해주세요. (예: 4, 6, 8, 12, 16, 24)");
-                                                        return;
-                                                    }
-                                                    if (confirm(`${numGroups}개 조로 자동 배정하시겠습니까? (기존 조 정보는 덮어씌워집니다)`)) {
-                                                        const perGroup = 48 / numGroups;
-                                                        const newGrid = gridData.map((row, idx) => ({
-                                                            ...row,
-                                                            group: `${Math.floor(idx / perGroup) + 1}조`
-                                                        }));
-                                                        setGridData(newGrid);
-                                                        alert("조 배정이 완료되었습니다. [참가자 명단] 탭에서 확인하세요.");
-                                                    }
-                                                }}
+                                                onClick={handleSmartAssign}
+                                                title="점수순 시드 배정 + 클럽 분산 배정"
                                             >
-                                                ⚡ 조 자동 배정
+                                                ⚡ 스마트 배정
                                             </button>
                                         </div>
                                         <p className="field-hint">전체 참가팀을 나눌 조의 개수입니다.</p>
@@ -322,23 +396,9 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                                         <button
                                             className="mini-btn"
                                             style={{ backgroundColor: '#9c27b0', color: 'white' }}
-                                            onClick={() => {
-                                                if (numGroups <= 0 || 48 % numGroups !== 0) {
-                                                    alert("48팀을 균등하게 나눌 수 있는 조 개수를 입력해주세요. (예: 4, 6, 8, 12, 16, 24)");
-                                                    return;
-                                                }
-                                                if (confirm(`${numGroups}개 조로 자동 배정하시겠습니까? (기존 조 정보는 덮어씌워집니다)`)) {
-                                                    const perGroup = 48 / numGroups;
-                                                    const newGrid = gridData.map((row, idx) => ({
-                                                        ...row,
-                                                        group: `${Math.floor(idx / perGroup) + 1}조`
-                                                    }));
-                                                    setGridData(newGrid);
-                                                    alert("조 배정이 완료되었습니다.");
-                                                }
-                                            }}
+                                            onClick={handleSmartAssign}
                                         >
-                                            ⚡ 조 자동 배정 ({numGroups}개)
+                                            ⚡ 스마트 배정 ({numGroups}개)
                                         </button>
                                         <button onClick={handleExcelDownload} className="mini-btn success">📥 엑셀 양식 다운</button>
                                         <label className="mini-btn info" style={{ cursor: 'pointer' }}>
