@@ -1,132 +1,11 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 const Standings = ({ teams, groups }) => {
-  const [viewMode, setViewMode] = useState('rankings'); // 'rankings' | 'roster'
-
-  // --- Roster View ---
-  if (viewMode === 'roster') {
-    return (
-      <div className="standings-container">
-        <div className="view-toggle">
-          <button onClick={() => setViewMode('rankings')} className="toggle-btn">📊 조별 순위</button>
-          <button onClick={() => setViewMode('roster')} className="toggle-btn active">📋 참가자 명단</button>
-        </div>
-
-        <div className="glass-card full-width">
-          <div className="table-responsive">
-            <table className="roster-table">
-              <thead>
-                <tr>
-                  <th>클럽</th>
-                  <th>이름(1)</th>
-                  <th>성별</th>
-                  <th>점수</th>
-                  <th>이름(2)</th>
-                  <th>성별</th>
-                  <th>점수</th>
-                  <th>합계</th>
-                  <th>조</th>
-                </tr>
-              </thead>
-              <tbody>
-                {teams.map(team => (
-                  <tr key={team.id}>
-                    <td>{team.club || '-'}</td>
-                    <td>{team.player1}</td>
-                    <td>{team.p1_gender || '-'}</td>
-                    <td>{team.p1_score || '-'}</td>
-                    <td>{team.player2}</td>
-                    <td>{team.p2_gender || '-'}</td>
-                    <td>{team.p2_score || '-'}</td>
-                    <td className="highlight">{team.total_score || '-'}</td>
-                    <td>
-                      {/* Find Group Name */}
-                      {groups.find(g => g.team_ids.includes(team.id))?.name || '-'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <style>{`
-            .standings-container {
-                max-width: 1200px;
-                margin: 0 auto;
-            }
-            .view-toggle {
-                display: flex;
-                gap: 10px;
-                margin-bottom: 1.5rem;
-                justify-content: center;
-            }
-            .toggle-btn {
-                padding: 0.8rem 1.5rem;
-                background: rgba(255,255,255,0.1);
-                border: 1px solid rgba(255,255,255,0.2);
-                color: #aaa;
-                border-radius: 20px;
-                cursor: pointer;
-                transition: all 0.2s;
-            }
-            .toggle-btn.active {
-                background: var(--tennis-yellow);
-                color: black;
-                font-weight: bold;
-                border-color: var(--tennis-yellow);
-            }
-            
-            .glass-card {
-                background: rgba(30,30,30,0.6);
-                backdrop-filter: blur(10px);
-                border-radius: 12px;
-                padding: 1rem;
-                border: 1px solid rgba(255,255,255,0.05);
-            }
-
-            .table-responsive {
-                overflow-x: auto;
-            }
-
-            .roster-table {
-                width: 100%;
-                border-collapse: collapse;
-                min-width: 800px; /* Force scroll on mobile */
-                font-size: 0.9rem;
-            }
-            .roster-table th {
-                background: rgba(0,0,0,0.3);
-                padding: 1rem;
-                text-align: center;
-                color: var(--tennis-yellow);
-                border-bottom: 2px solid rgba(255,255,255,0.1);
-                white-space: nowrap;
-            }
-            .roster-table td {
-                padding: 0.8rem;
-                text-align: center;
-                border-bottom: 1px solid rgba(255,255,255,0.05);
-                color: #ddd;
-            }
-            .roster-table tr:hover {
-                background: rgba(255,255,255,0.05);
-            }
-            .highlight {
-                color: var(--tennis-yellow);
-                font-weight: bold;
-            }
-        `}</style>
-      </div>
-    );
-  }
-
-  // --- Rankings View (Original) ---
+  // --- Rankings View (Only) ---
   return (
     <div className="standings-container">
-      <div className="view-toggle">
-        <button onClick={() => setViewMode('rankings')} className="toggle-btn active">📊 조별 순위</button>
-        <button onClick={() => setViewMode('roster')} className="toggle-btn">📋 참가자 명단</button>
+      <div className="card-header" style={{ marginBottom: '1.5rem', textAlign: 'center' }}>
+        <h3 style={{ color: 'var(--tennis-yellow)', fontSize: '1.5rem' }}>📊 조별 순위</h3>
       </div>
 
       <div className="rankings-grid">
@@ -172,31 +51,10 @@ const Standings = ({ teams, groups }) => {
       </div>
 
       <style>{`
-        /* Shared Toggle Styles */
-        .view-toggle {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 1.5rem;
-            justify-content: center;
-        }
-        .toggle-btn {
-            padding: 0.8rem 1.5rem;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            color: #aaa;
-            border-radius: 20px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .toggle-btn.active {
-            background: var(--tennis-yellow);
-            color: black;
-            font-weight: bold;
-            border-color: var(--tennis-yellow);
-        }
-
         .standings-container {
              /* Wrapper */
+             max-width: 1200px;
+             margin: 0 auto;
         }
 
         .rankings-grid {
