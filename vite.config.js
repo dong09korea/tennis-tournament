@@ -10,6 +10,6 @@ export default defineConfig({
         // VitePWA({...})
     ],
     build: {
-        outDir: 'dist_temp_6'
+        outDir: 'dist_build'
     }
 })
