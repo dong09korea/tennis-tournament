@@ -417,7 +417,122 @@ const assignWildcards = (wildcardTeams, exactBracketSlots, allTeamsMap) => {
     return assignedSlots;
 };
 
+// ─── Shared fixed bracket layout ────────────────────────────────────────────
+// Describes which group rank fills each of the 16 first-round match slots.
+// 'W' = wildcard (조 3위). Used by both shell init and progressive filling.
+export const FIXED_BRACKET_LAYOUT = [
+    { a: { rank: 1, g: 1 }, b: { rank: 2, g: 5 } },   // M1  (no wildcard)
+    { a: { rank: 1, g: 2 }, b: { rank: 3, g: 'W' } }, // M2
+    { a: { rank: 1, g: 3 }, b: { rank: 2, g: 7 } },   // M3  (no wildcard)
+    { a: { rank: 1, g: 4 }, b: { rank: 3, g: 'W' } }, // M4
+    { a: { rank: 1, g: 5 }, b: { rank: 3, g: 'W' } }, // M5
+    { a: { rank: 1, g: 6 }, b: { rank: 2, g: 10 } },  // M6  (no wildcard)
+    { a: { rank: 1, g: 7 }, b: { rank: 3, g: 'W' } }, // M7
+    { a: { rank: 1, g: 8 }, b: { rank: 2, g: 12 } },  // M8  (no wildcard)
+    { a: { rank: 1, g: 9 }, b: { rank: 3, g: 'W' } }, // M9
+    { a: { rank: 1, g: 10 }, b: { rank: 2, g: 6 } },  // M10 (no wildcard)
+    { a: { rank: 1, g: 11 }, b: { rank: 3, g: 'W' } },// M11
+    { a: { rank: 1, g: 12 }, b: { rank: 2, g: 8 } },  // M12 (no wildcard)
+    { a: { rank: 2, g: 4 }, b: { rank: 2, g: 9 } },   // M13 (no wildcard)
+    { a: { rank: 2, g: 3 }, b: { rank: 3, g: 'W' } }, // M14
+    { a: { rank: 2, g: 2 }, b: { rank: 2, g: 11 } },  // M15 (no wildcard)
+    { a: { rank: 2, g: 1 }, b: { rank: 3, g: 'W' } }  // M16
+];
+
+// Create an empty 32-bracket shell (all slots TBD) to store in Firebase early.
+// Should be called once as soon as the group schedule is generated.
+export const initBracket32Shell = () => {
+    const generateEmptyRound = (count, prefix, name, baseRound, nextPrefix) =>
+        Array.from({ length: count }, (_, i) => ({
+            id: `${prefix}_m${i + 1}`,
+            group_id: name,
+            round: baseRound + i,
+            team_a_id: 'TBD',
+            team_b_id: 'TBD',
+            score_a: 0, score_b: 0,
+            status: 'PENDING',
+            court_id: null, winner_id: null,
+            next_match_id: nextPrefix ? `${nextPrefix}_m${Math.floor(i / 2) + 1}` : null,
+            is_team_a_next: i % 2 === 0
+        }));
+
+    const matches32 = FIXED_BRACKET_LAYOUT.map((def, idx) => ({
+        id: `ko32_m${idx + 1}`,
+        group_id: '본선 32강',
+        round: 10 + idx,
+        team_a_id: 'TBD',
+        team_b_id: 'TBD',
+        score_a: 0, score_b: 0,
+        status: 'PENDING',
+        court_id: null, winner_id: null,
+        next_match_id: `ko16_m${Math.floor(idx / 2) + 1}`,
+        is_team_a_next: idx % 2 === 0,
+        hasWildcard: def.a.g === 'W' || def.b.g === 'W' // mark wildcard matches
+    }));
+
+    return [
+        ...matches32,
+        ...generateEmptyRound(8, 'ko16', '16강', 30, 'ko8'),
+        ...generateEmptyRound(4, 'ko8', '8강', 40, 'ko4'),
+        ...generateEmptyRound(2, 'ko4', '4강', 50, 'final'),
+        ...generateEmptyRound(1, 'final', '결승', 60, null)
+    ];
+};
+
+// Progressively fill 32-bracket slots for newly completed groups.
+// Returns a new matches array with slots filled in (and courts freed for newly
+// ready matches so the auto-assign loop can pick them up).
+// 'standings' = result of calculateStandings. 'wildcardMap' = { matchIdx: teamId }
+// for wildcard slots when all groups are done.
+export const fillBracket32Slots = (matches, teams, standings, wildcardMap = {}) => {
+    const newMatches = JSON.parse(JSON.stringify(matches));
+
+    const getGroupNum = (gStr) => parseInt(String(gStr).replace(/[^0-9]/g, ''), 10);
+
+    // Build lookup: groupNum → { 1: teamId, 2: teamId, 3: teamId }
+    const rankMap = {};
+    Object.entries(standings).forEach(([gName, groupTeams]) => {
+        const gNum = getGroupNum(gName);
+        if (!rankMap[gNum]) rankMap[gNum] = {};
+        groupTeams.forEach((t, idx) => { rankMap[gNum][idx + 1] = t.id; });
+    });
+
+    FIXED_BRACKET_LAYOUT.forEach((def, idx) => {
+        const match = newMatches.find(m => m.id === `ko32_m${idx + 1}`);
+        if (!match) return;
+
+        // Fill side A
+        if (match.team_a_id === 'TBD') {
+            if (def.a.g === 'W') {
+                if (wildcardMap[idx] !== undefined) match.team_a_id = wildcardMap[idx];
+            } else {
+                const tid = rankMap[def.a.g]?.[def.a.rank];
+                if (tid) match.team_a_id = tid;
+            }
+        }
+
+        // Fill side B
+        if (match.team_b_id === 'TBD') {
+            if (def.b.g === 'W') {
+                if (wildcardMap[idx] !== undefined) match.team_b_id = wildcardMap[idx];
+            } else {
+                const tid = rankMap[def.b.g]?.[def.b.rank];
+                if (tid) match.team_b_id = tid;
+            }
+        }
+
+        // If both sides are now filled (and match hasn't started), mark ready for court assignment
+        if (match.team_a_id !== 'TBD' && match.team_b_id !== 'TBD' &&
+            match.status === 'PENDING' && !match.court_id) {
+            match._readyForCourt = true; // flag for court assignment loop
+        }
+    });
+
+    return newMatches;
+};
+
 // Generate 32-team Knockout Bracket (Fixed Mapping)
+
 export const generateBracket32 = (top32Teams, groupedStandings) => {
     // 1. Separate Top 32 into 1sts, 2nds, and Wildcards (3rds)
     // We can rely on groupRank from top32Teams

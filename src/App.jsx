@@ -6,7 +6,7 @@ import AdminDashboard from './components/AdminDashboardNew';
 import initialData from './assets/data.json';
 
 import { subscribeToData, uploadData } from './services/firebase';
-import { assignMatchesToCourts } from './utils/tournamentLogic';
+import { assignMatchesToCourts, calculateStandings, getTop32Teams, generateBracket32, initBracket32Shell, FIXED_BRACKET_LAYOUT } from './utils/tournamentLogic';
 
 // Request notification permission on load
 const requestNotifPermission = async () => {
@@ -38,6 +38,7 @@ function App() {
     const alarmAudioRef = useRef(null);
     const latestDataRef = useRef(initialData);
     const adminRef = useRef(null);
+    const autoKnock32DoneRef = useRef(false); // prevent repeated auto-generation
 
     // For Lottery Animation preview in Standings
     const [previewTeams, setPreviewTeams] = useState(null);
@@ -131,18 +132,14 @@ function App() {
             const hasEmptyCourts = newData.courts.some(c => {
                 if (c.match_id === null) return true;
                 const linkedMatch = newData.matches.find(m => m.id === c.match_id);
-                // If a court points to a match that is NOT LIVE (completed or cancelled back to pending), consider the court empty
                 return !linkedMatch || linkedMatch.status !== 'LIVE';
             });
             const hasPendingMatches = newData.matches.some(m => m.status === 'PENDING' && !m.court_id);
 
             if (hasEmptyCourts && hasPendingMatches) {
-                // Debounce: wait for all simultaneous completions then run once
                 if (assignDebounceRef.current) clearTimeout(assignDebounceRef.current);
                 assignDebounceRef.current = setTimeout(async () => {
                     try {
-                        // IMPORTANT: Use latestDataRef.current inside the timeout closure 
-                        // because the snapshot where the court was freed might be a separate later event!
                         const freshestData = latestDataRef.current;
                         if (!freshestData || !freshestData.matches || !freshestData.courts) return;
 
@@ -156,6 +153,102 @@ function App() {
                         console.error('Auto assign error', e);
                     }
                 }, 1000);
+            }
+
+            // ── Progressive 32-bracket slot filling ─────────────────────────
+            const knockoutGroups = ['본선 32강', '16강', '8강', '4강', '결승', '본선 16강 (무작위)'];
+            const isGroupMatch = (m) => {
+                const g = m.group_id;
+                return typeof g === 'number' || (typeof g === 'string' && g.includes('조')) || /^\d+$/.test(String(g));
+            };
+            const groupMatches = newData.matches.filter(isGroupMatch);
+            const bracketShellExists = newData.matches.some(m => m.group_id === '본선 32강');
+
+            if (groupMatches.length > 0 && newData.teams) {
+                // Step 1: If no bracket shell at all yet, create one now (once)
+                if (!bracketShellExists && !autoKnock32DoneRef.current) {
+                    autoKnock32DoneRef.current = true;
+                    setTimeout(async () => {
+                        const fd = latestDataRef.current;
+                        if (!fd || fd.matches.some(m => m.group_id === '본선 32강')) return;
+                        const shell = initBracket32Shell();
+                        await uploadData({ ...fd, matches: [...fd.matches, ...shell] });
+                        console.log('✅ 32강 브라켓 틀 생성 완료');
+                    }, 800);
+                }
+
+                // Step 2: Fill slots for completed groups + all-done wildcard fill
+                if (bracketShellExists) {
+                    if (assignDebounceRef.current) clearTimeout(assignDebounceRef.current);
+                    assignDebounceRef.current = setTimeout(async () => {
+                        const fd = latestDataRef.current;
+                        if (!fd || !fd.matches || !fd.teams) return;
+
+                        const standings = calculateStandings(fd.teams, fd.matches);
+
+                        // Build wildcard map only when ALL groups are done
+                        const allGroupsDone = fd.matches.filter(isGroupMatch).every(m => m.status === 'COMPLETED');
+                        let wildcardMap = {};
+                        if (allGroupsDone) {
+                            const top32 = getTop32Teams(standings);
+                            const wildcards = top32.filter(t => t.groupRank === 3);
+                            // Assign wildcards to their W-slots using existing backtrack logic (reuse generateBracket32 result)
+                            const tempBracket = generateBracket32(top32);
+                            tempBracket.filter(m => m.group_id === '본선 32강').forEach((m, idx) => {
+                                if (m.team_a_id !== 'TBD' || m.team_b_id !== 'TBD') {
+                                    wildcardMap[idx] = { a: m.team_a_id, b: m.team_b_id };
+                                }
+                            });
+                        }
+
+                        // Fill slots progressively
+                        let updatedMatches = JSON.parse(JSON.stringify(fd.matches));
+                        const getGroupNum = (g) => parseInt(String(g).replace(/[^0-9]/g, ''), 10);
+                        const rankMap = {};
+                        Object.entries(standings).forEach(([gName, teams]) => {
+                            const gNum = getGroupNum(gName);
+                            rankMap[gNum] = {};
+                            teams.forEach((t, i) => { rankMap[gNum][i + 1] = t.id; });
+                        });
+
+                        let changed = false;
+                        updatedMatches = updatedMatches.map((match, _) => {
+                            if (match.group_id !== '본선 32강') return match;
+                            const idx = parseInt(match.id.replace('ko32_m', '')) - 1;
+                            if (isNaN(idx) || idx < 0 || idx > 15) return match;
+                            const def = FIXED_BRACKET_LAYOUT[idx];
+                            if (!def) return match;
+
+                            let m = { ...match };
+
+                            // Fill side A
+                            if (m.team_a_id === 'TBD') {
+                                if (def.a.g === 'W') {
+                                    if (allGroupsDone && wildcardMap[idx]?.a) { m.team_a_id = wildcardMap[idx].a; changed = true; }
+                                } else {
+                                    const tid = rankMap[def.a.g]?.[def.a.rank];
+                                    if (tid) { m.team_a_id = tid; changed = true; }
+                                }
+                            }
+                            // Fill side B
+                            if (m.team_b_id === 'TBD') {
+                                if (def.b.g === 'W') {
+                                    if (allGroupsDone && wildcardMap[idx]?.b) { m.team_b_id = wildcardMap[idx].b; changed = true; }
+                                } else {
+                                    const tid = rankMap[def.b.g]?.[def.b.rank];
+                                    if (tid) { m.team_b_id = tid; changed = true; }
+                                }
+                            }
+                            return m;
+                        });
+
+                        if (changed) {
+                            const { matches: assigned, courts: assignedCourts } = assignMatchesToCourts(updatedMatches, fd.courts);
+                            await uploadData({ ...fd, matches: assigned, courts: assignedCourts });
+                            console.log('✅ 32강 슬롯 업데이트 완료');
+                        }
+                    }, 1200);
+                }
             }
 
             prevMatchesRef.current = newData.matches || [];
