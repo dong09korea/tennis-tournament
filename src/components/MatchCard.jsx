@@ -5,6 +5,7 @@ import { updateTournamentProgression, FIXED_BRACKET_LAYOUT } from '../utils/tour
 const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
   const isCompleted = match.status === 'COMPLETED';
   const isLive = match.status === 'LIVE';
+  const isPending = match.status === 'PENDING' || match.status === 'SCHEDULED';
 
   const getScoreStyle = (isWinner) => ({
     color: isWinner ? 'var(--tennis-yellow)' : '#fff',
@@ -113,8 +114,9 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
       <div className="card-header">
         <span className="match-info">{match.group_id} - R{match.round}</span>
         <div style={{ display: 'flex', gap: '5px' }}>
-          {isLive && <span className="live-badge">● LIVE</span>}
-          {isCompleted && <span className="completed-badge">종료</span>}
+          {isLive && <span className="live-badge">● 진행중</span>}
+          {isCompleted && <span className="completed-badge">✓ 종료</span>}
+          {isPending && !isLive && !isCompleted && <span className="pending-badge">대기중</span>}
           {isAdmin && (
             <select
               value={match.status}
@@ -242,9 +244,26 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
           color: var(--tennis-yellow);
           font-weight: bold;
           animation: pulse 2s infinite;
+          background: rgba(213,255,0,0.12);
+          padding: 2px 8px;
+          border-radius: 50px;
+          font-size: 0.78rem;
         }
         .completed-badge {
+          color: #1de9b6;
+          font-weight: 700;
+          font-size: 0.78rem;
+          background: rgba(29,233,182,0.13);
+          padding: 2px 8px;
+          border-radius: 50px;
+          letter-spacing: 0.02em;
+        }
+        .pending-badge {
           color: #888;
+          font-size: 0.78rem;
+          background: rgba(255,255,255,0.06);
+          padding: 2px 8px;
+          border-radius: 50px;
         }
         .team-row {
           display: flex;
