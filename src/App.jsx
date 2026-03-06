@@ -3,7 +3,6 @@ import Layout from './components/Layout';
 import Bracket from './components/BracketFixed';
 import Standings from './components/Standings';
 import AdminDashboard from './components/AdminDashboardNew';
-import initialData from './assets/data.json';
 
 import { subscribeToData, uploadData } from './services/firebase';
 import { assignMatchesToCourts, calculateStandings, getTop32Teams, generateBracket32, initBracket32Shell, FIXED_BRACKET_LAYOUT } from './utils/tournamentLogic';
@@ -28,7 +27,7 @@ const registerSW = async () => {
 
 function App() {
     const [activeTab, setActiveTab] = useState(() => localStorage.getItem('activeTab') || 'live');
-    const [data, setData] = useState(initialData);
+    const [data, setData] = useState({ teams: [], groups: [], matches: [], courts: [] });
     const [status, setStatus] = useState("");
     const [isAdmin, setIsAdmin] = useState(() => localStorage.getItem('isAdmin') === 'true');
     const [numCourts, setNumCourts] = useState(() => Number(localStorage.getItem('numCourts')) || 10);
@@ -36,7 +35,7 @@ function App() {
     const prevMatchesRef = useRef([]);
     const assignDebounceRef = useRef(null);
     const alarmAudioRef = useRef(null);
-    const latestDataRef = useRef(initialData);
+    const latestDataRef = useRef({ teams: [], groups: [], matches: [], courts: [] });
     const adminRef = useRef(null);
     const autoKnock32DoneRef = useRef(false); // prevent repeated auto-generation
 
