@@ -166,10 +166,25 @@ export const assignMatchesToCourts = (matches, courts) => {
         m.team_b_id !== 'TBD' && m.team_b_id !== 'BYE'
     );
 
+    // GROUP STAGE PRIORITY: If ANY group match is still Pending or Live,
+    // knockout matches must NOT take a court yet.
+    const isGroupMatch = (m) => {
+        const g = m.group_id;
+        return typeof g === 'number' ||
+            (typeof g === 'string' && /^\d+조$/.test(g)) ||
+            /^\d+$/.test(String(g));
+    };
+    const groupStageActive = nextMatches.some(m =>
+        isGroupMatch(m) && (m.status === 'PENDING' || m.status === 'LIVE')
+    );
+    if (groupStageActive) {
+        // Only allow group-stage matches into courts while group stage is running
+        pendingMatches = pendingMatches.filter(isGroupMatch);
+    }
+
     // Simplistic sorting: Prioritize by 'round' ascending.
-    // Since generateSchedule already perfectly interleaved the games and assigned sequential 'round' numbers,
-    // this ensures we assign all "Match 1s" across groups before moving to "Match 2s".
     pendingMatches.sort((a, b) => a.round - b.round);
+
 
     // 4. Assign
     for (const court of emptyCourts) {
