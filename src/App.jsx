@@ -199,15 +199,16 @@ function App() {
             const bracketShellExists = newData.matches.some(m => m.group_id === '본선 32강');
 
             if (groupMatches.length > 0 && newData.teams) {
-                // Step 1: If no bracket shell at all yet, create one now (once)
-                if (!bracketShellExists && !autoKnock32DoneRef.current) {
+                const allGroupsDoneForShell = groupMatches.length > 0 && groupMatches.every(m => m.status === 'COMPLETED');
+                // Step 1: Only create bracket shell AFTER all group matches are done
+                if (!bracketShellExists && !autoKnock32DoneRef.current && allGroupsDoneForShell) {
                     autoKnock32DoneRef.current = true;
                     setTimeout(async () => {
                         const fd = latestDataRef.current;
                         if (!fd || fd.matches.some(m => m.group_id === '본선 32강')) return;
                         const shell = initBracket32Shell();
                         await uploadData({ ...fd, matches: [...fd.matches, ...shell] });
-                        console.log('✅ 32강 브라켓 틀 생성 완료');
+                        console.log('✅ 32강 브라켓 틀 생성 완료 (모든 예선 완료 후)');
                     }, 800);
                 }
 
