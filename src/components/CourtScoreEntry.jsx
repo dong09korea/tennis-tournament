@@ -52,6 +52,19 @@ const CourtScoreEntry = () => {
         return () => unsubscribe();
     }, []);
 
+    // Derived state for the initialization effect
+    const court = data?.courts?.find(c => c.id === parseInt(courtId));
+    const currentMatch = data?.matches?.find(m => m.id === court?.match_id);
+
+    // Initialize state from Firebase data if currently empty
+    useEffect(() => {
+        if (!currentMatch) return;
+        if (scoreA === '' && currentMatch.score_a != null) setScoreA(String(currentMatch.score_a));
+        if (scoreB === '' && currentMatch.score_b != null) setScoreB(String(currentMatch.score_b));
+        if (tbScoreA === '' && currentMatch.tb_score_a != null) setTbScoreA(String(currentMatch.tb_score_a));
+        if (tbScoreB === '' && currentMatch.tb_score_b != null) setTbScoreB(String(currentMatch.tb_score_b));
+    }, [currentMatch, scoreA, scoreB, tbScoreA, tbScoreB]);
+
     if (loading) {
         return (
             <div className="mobile-container">
@@ -60,7 +73,6 @@ const CourtScoreEntry = () => {
         );
     }
 
-    const court = data?.courts?.find(c => c.id === parseInt(courtId));
     if (!court) {
         return (
             <div className="mobile-container">
@@ -73,7 +85,6 @@ const CourtScoreEntry = () => {
     }
 
     // Always allow scoring if a match is assigned to this court, even if its status reverted to PENDING
-    const currentMatch = data?.matches?.find(m => m.id === court.match_id);
     if (!currentMatch || currentMatch.status === 'COMPLETED') {
         return (
             <div className="mobile-container">
@@ -88,15 +99,6 @@ const CourtScoreEntry = () => {
 
     const teamA = data?.teams?.find(t => t.id === currentMatch.team_a_id);
     const teamB = data?.teams?.find(t => t.id === currentMatch.team_b_id);
-
-    // Initialize state from Firebase data if currently empty
-    useEffect(() => {
-        if (!currentMatch) return;
-        if (scoreA === '' && currentMatch.score_a != null) setScoreA(String(currentMatch.score_a));
-        if (scoreB === '' && currentMatch.score_b != null) setScoreB(String(currentMatch.score_b));
-        if (tbScoreA === '' && currentMatch.tb_score_a != null) setTbScoreA(String(currentMatch.tb_score_a));
-        if (tbScoreB === '' && currentMatch.tb_score_b != null) setTbScoreB(String(currentMatch.tb_score_b));
-    }, [currentMatch, scoreA, scoreB, tbScoreA, tbScoreB]);
 
     const isGroupStage = isGroupStageMatch(currentMatch);
     const numA = parseInt(scoreA) || 0;
