@@ -24,7 +24,11 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
         const mIdx = parseInt(matchNumMatch[1], 10) - 1;
         if (FIXED_BRACKET_LAYOUT[mIdx]) {
           const def = isTeamA ? FIXED_BRACKET_LAYOUT[mIdx].a : FIXED_BRACKET_LAYOUT[mIdx].b;
-          if (def.g === 'W') return '와일드카드';
+          if (def.g === 'W') {
+            const originGroup = team.initial_group ? String(team.initial_group).replace(/조/g, '') : '?';
+            const originRank = team.groupRank || '3';
+            return `${originGroup}조 ${originRank}위`;
+          }
           return `${def.g}조 ${def.rank}위`;
         }
       }
