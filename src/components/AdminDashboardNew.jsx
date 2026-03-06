@@ -1,33 +1,73 @@
-import React, { useState, useEffect } from 'react';
-import { generateGroups, generateSchedule, assignMatchesToCourts } from '../utils/tournamentLogic';
+import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { generateGroups, generateSchedule, assignMatchesToCourts, calculateStandings, getTop32Teams, generateBracket32, updateTournamentProgression } from '../utils/tournamentLogic';
 import { uploadData, updateMatch, resetTournamentData } from '../services/firebase';
+import { QRCodeSVG } from 'qrcode.react';
 import * as XLSX from 'xlsx';
+import MatchCard from './MatchCard';
 
-const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
+const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, numCourts, setNumCourts }, ref) => {
     // Local State
-    const [numTeams, setNumTeams] = useState(48); // Default 48 Teams
-    const [numGroups, setNumGroups] = useState(8); // Default 8 Groups
-    const [numCourts, setNumCourts] = useState(10);
+    const [numTeams, setNumTeams] = useState(() => {
+        const stored = localStorage.getItem('adminNumTeams');
+        return stored ? Number(stored) : 48;
+    }); // Default 48 Teams
+    const [numGroups, setNumGroups] = useState(() => {
+        const stored = localStorage.getItem('adminNumGroups');
+        return stored ? Number(stored) : 8;
+    }); // Default 8 Groups
     const [password, setPassword] = useState("");
     const [statusMsg, setStatusMsg] = useState("");
     const [isProcessing, setIsProcessing] = useState(false);
-    const [activeTab, setActiveTab] = useState('settings'); // 'settings' | 'grouping'
+    const drawOrderRef = useRef(0);
+    const [activeTab, setActiveTab] = useState(() => {
+        return localStorage.getItem('adminActiveTab') || 'settings';
+    });
+    const [activeManageTab, setActiveManageTab] = useState(() => {
+        return localStorage.getItem('adminActiveManageTab') || '전체';
+    });
+
+    useImperativeHandle(ref, () => ({
+        handleSmartAssign,
+        handleGenerate,
+        triggerLotteryAnimation
+    }));
 
     // Grid State: numTeams Rows
-    const [gridData, setGridData] = useState(
-        Array.from({ length: 48 }, (_, i) => ({
-            id: i,
-            group: '',
-            club: '',
-            p1_name: '',
-            p1_gender: '',
-            p1_score: '',
-            p2_name: '',
-            p2_gender: '',
-            p2_score: '',
-            total_score: ''
-        }))
-    );
+    const [gridData, setGridData] = useState(() => {
+        try {
+            const stored = localStorage.getItem('adminGridData');
+            if (stored) {
+                const parsed = JSON.parse(stored);
+                if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+            }
+        } catch (e) {
+            console.error("Failed to parse stored grid data", e);
+        }
+        return Array.from({ length: 48 }, (_, i) => ({
+            id: i, group: '', club: '', p1_name: '', p1_gender: '', p2_name: '', p2_gender: ''
+        }));
+    });
+
+    // Persist configurations
+    useEffect(() => {
+        localStorage.setItem('adminNumTeams', numTeams);
+    }, [numTeams]);
+
+    useEffect(() => {
+        localStorage.setItem('adminNumGroups', numGroups);
+    }, [numGroups]);
+
+    useEffect(() => {
+        localStorage.setItem('adminGridData', JSON.stringify(gridData));
+    }, [gridData]);
+
+    useEffect(() => {
+        localStorage.setItem('adminActiveTab', activeTab);
+    }, [activeTab]);
+
+    useEffect(() => {
+        localStorage.setItem('adminActiveManageTab', activeManageTab);
+    }, [activeManageTab]);
 
     // Update grid when numTeams changes
     useEffect(() => {
@@ -39,7 +79,7 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                     id: prev.length + i,
                     group: '',
                     club: '',
-                    ...{ p1_name: '', p1_gender: '', p1_score: '', p2_name: '', p2_gender: '', p2_score: '', total_score: '' }
+                    p1_name: '', p1_gender: '', p2_name: '', p2_gender: ''
                 }));
                 return [...prev, ...added];
             } else {
@@ -60,17 +100,13 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
 
     // --- Excel Handlers ---
     const handleExcelDownload = () => {
-        const ws = XLSX.utils.json_to_sheet(gridData.map(r => ({
-            '조': r.group,
-            '클럽': r.club,
-            '이름1': r.p1_name,
-            '성별1': r.p1_gender,
-            '점수1': r.p1_score,
-            '이름2': r.p2_name,
-            '성별2': r.p2_gender,
-            '점수2': r.p2_score,
-            '합계': r.total_score
-        })));
+        const exportData = gridData.map((r, i) => ({
+            ' ': i + 1, // Empty header for index
+            '참가자A': r.p1_name,
+            '참가자B': r.p2_name,
+            '클럽': r.club
+        }));
+        const ws = XLSX.utils.json_to_sheet(exportData);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, "참가자명단");
         XLSX.writeFile(wb, "tennis_teams_template.xlsx");
@@ -88,30 +124,32 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
             const ws = wb.Sheets[wsname];
             const data = XLSX.utils.sheet_to_json(ws, { header: 1 }); // Array of arrays
 
-            // Parse data (Skip header row if exists)
-            // Assuming header on row 0: '조', '클럽', ...
-            // Map to gridData
-            const newGrid = [...gridData];
-            // Start from row 1 (index 1) if header exists. Let's assume header exists.
-            let gridIdx = 0;
+            // Assuming header on row 0: ' ', '참가자A', '참가자B', '클럽'
+            const newGrid = Array.from({ length: numTeams }, (_, i) => ({
+                id: i,
+                group: '',
+                club: '',
+                p1_name: '',
+                p1_gender: '',
+                p2_name: '',
+                p2_gender: '',
+                age: ''
+            }));
+
+            // Start from row 1 (index 1) if header exists.
             for (let i = 1; i < data.length; i++) {
-                if (gridIdx >= numTeams) break;
+                if (i - 1 >= numTeams) break; // Ensure we don't exceed numTeams
                 const row = data[i];
                 if (!row || row.length === 0) continue;
 
-                newGrid[gridIdx] = {
-                    ...newGrid[gridIdx],
-                    group: row[0] || '',
-                    club: row[1] || '',
-                    p1_name: row[2] || '',
-                    p1_gender: row[3] || '',
-                    p1_score: row[4] || '',
-                    p2_name: row[5] || '',
-                    p2_gender: row[6] || '',
-                    p2_score: row[7] || '',
-                    total_score: row[8] || ''
+                newGrid[i - 1] = {
+                    ...newGrid[i - 1],
+                    p1_name: row[1] || '',
+                    p2_name: row[2] || '',
+                    club: row[3] || '',
+                    age: row[4] || '', // Assuming age is in the 5th column if provided
+                    group: ''
                 };
-                gridIdx++;
             }
             setGridData(newGrid);
             alert("엑셀 데이터가 로드되었습니다.");
@@ -126,11 +164,11 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
     };
 
     // --- Generation Logic ---
-    const handleGenerate = async () => {
+    const handleGenerate = async (skipConfirm = false) => {
         // Filter valid teams (must have names)
         const validRows = gridData.filter(r => r.p1_name && r.p2_name);
 
-        if (validRows.length === 0) {
+        if (!skipConfirm && validRows.length === 0) {
             alert("참가자 명단을 입력해주세요. (최소한 이름1, 이름2는 필수입니다)");
             return;
         }
@@ -146,14 +184,13 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                 player2: r.p2_name,
                 club: r.club,
                 p1_gender: r.p1_gender,
-                p1_score: r.p1_score,
                 p2_gender: r.p2_gender,
-                p2_score: r.p2_score,
-                total_score: r.total_score,
+                age: r.age,
+                drawOrder: r.drawOrder ?? 9999,
                 initial_group: r.group // Use manual group
             }));
 
-            if (teams.length < numGroups) {
+            if (!skipConfirm && teams.length < numGroups) {
                 if (!confirm(`팀 수(${teams.length})가 조 개수(${numGroups})보다 적습니다. 계속 진행할까요?`)) {
                     setIsProcessing(false);
                     return;
@@ -184,6 +221,195 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
         }
     };
 
+    const handleGenerateKnockout32 = async () => {
+        if (!data || !data.teams || !data.matches) {
+            alert("먼저 예선전을 생성하고 진행해주세요.");
+            return;
+        }
+
+        setIsProcessing(true);
+        setStatusMsg("32강 본선 대진 자동 추첨 중...");
+
+        try {
+            // 1. Calculate final standings from all current matches
+            const standings = calculateStandings(data.teams, data.matches);
+
+            // 2. Select Top 32
+            const top32 = getTop32Teams(standings);
+
+            if (top32.length < 2) {
+                alert("본선에 진출할 팀이 충분하지 않습니다.");
+                setIsProcessing(false);
+                return;
+            }
+
+            // 3. Generate Bracket
+            const knockoutMatches = generateBracket32(top32);
+
+            // 4. Update team state with their assigned Knockout Ranks
+            const updatedTeams = data.teams.map(t => {
+                const statInfo = top32.find(s => s.id === t.id);
+                if (statInfo) {
+                    return {
+                        ...t,
+                        groupRank: statInfo.groupRank,
+                        initial_group: statInfo.group_id || t.group
+                    };
+                }
+                return t;
+            });
+
+            // CLEAR existing knockout matches to prevent duplicate ID overwrites and replace the whole tree
+            const knockoutGroups = ["본선 32강", "16강", "8강", "4강", "결승", "본선 16강 (무작위)"];
+            const remainingMatches = data.matches.filter(m => !knockoutGroups.includes(m.group_id));
+
+            // FREE courts that were improperly pointing to any of the deleted knockout matches
+            const oldKnockoutIds = data.matches.filter(m => knockoutGroups.includes(m.group_id)).map(m => m.id);
+            const freedCourts = data.courts.map(c => {
+                if (oldKnockoutIds.includes(c.match_id)) {
+                    return { ...c, match_id: null };
+                }
+                return c;
+            });
+
+            // 5. Append to existing matches, then auto-assign to courts
+            const allMatches = [...remainingMatches, ...knockoutMatches];
+            const { matches: assignedMatches, courts: assignedCourts } = assignMatchesToCourts(allMatches, freedCourts);
+
+            const newData = {
+                ...data,
+                teams: updatedTeams,
+                matches: assignedMatches,
+                courts: assignedCourts
+            };
+
+            await uploadData(newData);
+            setStatusMsg("✅ 32강 본선 대진표 생성 + 코트 배정 완료!");
+            setTimeout(() => setStatusMsg(""), 3000);
+
+        } catch (e) {
+            console.error(e);
+            setStatusMsg("❌ 오류: " + e.message);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleGenerateKnockout16Random = async () => {
+        if (!data || !data.matches) return;
+
+        // Find teams that won in round 32
+        const round32Matches = data.matches.filter(m => m.group_id === "본선 32강" && m.status === "COMPLETED");
+        if (round32Matches.length < 8) {
+            alert("32강 경기가 충분히 완료되지 않았습니다.");
+            return;
+        }
+
+        const winningTeamIds = round32Matches.map(m => m.winner_id).filter(id => id && id !== "BYE");
+        const advancingTeams = data.teams.filter(t => winningTeamIds.includes(t.id));
+
+        setIsProcessing(true);
+        setStatusMsg("16강 무작위 대진 추첨 중...");
+
+        try {
+            const matches16 = generateBracket16Random(advancingTeams);
+            const allMatches16 = [...data.matches, ...matches16];
+            const { matches: assigned16, courts: courts16 } = assignMatchesToCourts(allMatches16, data.courts);
+            const newData = {
+                ...data,
+                matches: assigned16,
+                courts: courts16
+            };
+            await uploadData(newData);
+            setStatusMsg("✅ 16강 무작위 대진표 생성 + 코트 배정 완료!");
+            setTimeout(() => setStatusMsg(""), 3000);
+        } catch (e) {
+            console.error(e);
+            setStatusMsg("❌ 오류: " + e.message);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const handleGenerateSequentialKnockout = async (prevRoundName, nextRoundName, nextMatchPrefix, nextRoundIndex) => {
+        if (!data || !data.matches) return;
+        const prevMatches = data.matches.filter(m => m.group_id === prevRoundName).sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+        if (prevMatches.length === 0) {
+            alert(`${prevRoundName} 경기가 존재하지 않습니다.`);
+            return;
+        }
+
+        setIsProcessing(true);
+        setStatusMsg(`${nextRoundName} 대진표 생성 중...`);
+        try {
+            const nextMatches = generateNextRound(prevMatches, nextRoundName, nextMatchPrefix, nextRoundIndex);
+            const allMatchesNext = [...data.matches, ...nextMatches];
+            const { matches: assignedNext, courts: courtsNext } = assignMatchesToCourts(allMatchesNext, data.courts);
+            await uploadData({ ...data, matches: assignedNext, courts: courtsNext });
+            setStatusMsg(`✅ ${nextRoundName} 대진표 생성 + 코트 배정 완료!`);
+            setTimeout(() => setStatusMsg(""), 3000);
+        } catch (e) {
+            console.error(e);
+            setStatusMsg("❌ 오류: " + e.message);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const fillMockData = () => {
+        const mock = Array.from({ length: 48 }, (_, i) => ({
+            id: i,
+            group: '',
+            club: `Club ${i % 5}`, // Mix of 5 clubs to test distribution
+            p1_name: `User ${i}A`,
+            p1_gender: 'M',
+            p2_name: `User ${i}B`,
+            p2_gender: 'F'
+        }));
+        setGridData(mock);
+        setNumTeams(48);
+        setNumGroups(12); // Test with 12 groups of 4 as per typical 48 team setup
+    };
+
+    const handleFastForwardGroups = async () => {
+        if (!data || !data.matches) return;
+        setIsProcessing(true);
+        setStatusMsg("예선전 결과를 무작위로 시뮬레이션 중...");
+
+        try {
+            const nextMatches = data.matches.map(m => {
+                const isGroupStage = typeof m.group_id === 'number' || (typeof m.group_id === 'string' && m.group_id.includes("조"));
+                if (isGroupStage && m.status !== "COMPLETED") {
+                    // Random win/loss avoiding ties
+                    const scoreA = Math.floor(Math.random() * 7);
+                    const scoreB = Math.floor(Math.random() * 7);
+                    const finalB = scoreA === scoreB ? scoreB + 1 : scoreB;
+                    return {
+                        ...m,
+                        score_a: scoreA,
+                        score_b: finalB,
+                        status: "COMPLETED",
+                        winner_id: scoreA > finalB ? m.team_a_id : m.team_b_id,
+                        court_id: null
+                    };
+                }
+                return m;
+            });
+
+            // Free all courts
+            const nextCourts = data.courts.map(c => ({ ...c, match_id: null }));
+
+            await uploadData({ ...data, matches: nextMatches, courts: nextCourts });
+            setStatusMsg("✅ 예선전 전경기 무작위 종료 완료!");
+            setTimeout(() => setStatusMsg(""), 3000);
+        } catch (e) {
+            console.error(e);
+            setStatusMsg("❌ 오류: " + e.message);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     // --- Smart Assign Logic ---
     const handleSmartAssign = () => {
         if (numGroups <= 0 || numTeams % numGroups !== 0) {
@@ -191,70 +417,107 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
             return;
         }
 
-        if (!confirm(`${numGroups}개 조로 '스마트 배정' 하시겠습니까?\n(1. 점수순 시드 배정, 2. 클럽 중복 최소화)`)) {
+        if (!confirm(`${numGroups}개 조로 '스마트 배정' 하시겠습니까?\n(클럽 중복 최소화 무작위 배정)`)) {
             return;
         }
 
         // 1. Get valid teams from grid
-        const validTeams = gridData.map((row, idx) => ({ ...row, originalIdx: idx })).filter(r => r.p1_name || r.club || r.total_score);
+        const validTeams = gridData.map((row, idx) => ({ ...row, originalIdx: idx })).filter(r => r.p1_name || r.club);
 
-        // 2. Sort by Total Score (Desc) for Seeding
-        // Treat empty score as 0
-        validTeams.sort((a, b) => {
-            const scoreA = parseFloat(a.total_score) || 0;
-            const scoreB = parseFloat(b.total_score) || 0;
-            return scoreB - scoreA;
-        });
+        // 2. Randomize teams for fair distribution (since we removed score seeding)
+        validTeams.sort(() => Math.random() - 0.5);
 
         // 3. Prepare Buckets
         const groups = Array.from({ length: numGroups }, () => []);
 
-        // 4. Distribute (Snake Draft + Club Constraint)
-        // We iterate through teams. For each team, we find the best group.
-        // Rule: Avoid group where a team from same 'club' exists (if possible).
-        // Rule: Balance group sizes (Snake order helps, but we enforce size limit).
-
+        // 4. Distribute (Backtracking for strict club constraints)
         const teamsPerGroup = numTeams / numGroups;
 
-        validTeams.forEach((team, i) => {
-            // Determine snake direction based on round
-            // Round 0 (0..numGroups-1): Forward
-            // Round 1 (numGroups..2*numGroups-1): Backward? 
-            // Actually, simplified balancing:
-            // Just find a group that is not full.
-
-            // Preferred groups: Not full AND No club conflict
-            let candidateGroups = groups.map((g, idx) => ({ id: idx, members: g, count: g.length }))
-                .filter(g => g.count < teamsPerGroup); // Must have space
-
-            // Try to filter by Club Conflict
-            const club = team.club ? team.club.trim() : "";
-            let bestGroups = candidateGroups;
-
-            if (club) {
-                const noConflictGroups = candidateGroups.filter(g => !g.members.some(m => m.club && m.club.trim() === club));
-                if (noConflictGroups.length > 0) {
-                    bestGroups = noConflictGroups;
-                }
-                // If noConflictGroups is empty, we MUST conflict (Pigeonhole). Fallback to candidateGroups.
-            }
-
-            // From bestGroups, pick the one with fewest members (to balance filling)
-            // If equal, picking random or sequential? 
-            // To simulate "Snake Seeding" behavior along with Club constraint is hard.
-            // Let's prioritize "Smallest size" first to keep them even.
-            bestGroups.sort((a, b) => a.count - b.count);
-
-            // If counts are equal, maybe use ID based on Snake?
-            // Simple approach: Just pick the first.
-
-            if (bestGroups.length > 0) {
-                groups[bestGroups[0].id].push(team);
-            } else {
-                // Should not happen if total teams <= 48
-                console.warn("No space left for team", team);
+        // Group by club to check if mathematically impossible
+        const clubCounts = {};
+        validTeams.forEach(t => {
+            const c = t.club ? t.club.trim() : "";
+            if (c) {
+                clubCounts[c] = (clubCounts[c] || 0) + 1;
             }
         });
+
+        // Validate possibility
+        const maxSingleClub = Object.values(clubCounts).reduce((m, v) => Math.max(m, v), 0);
+        const strictMode = maxSingleClub <= numGroups;
+
+        if (!strictMode) {
+            alert(`⚠️ 주의: 특정 클럽의 인원(${maxSingleClub}명)이 전체 조 개수(${numGroups}개)보다 많아 완벽한 분산이 불가능하여 일부 중복이 발생합니다.`);
+        }
+
+        // Sort validTeams to place largest clubs first (optimizes backtracking)
+        validTeams.sort((a, b) => {
+            const countA = a.club ? clubCounts[a.club.trim()] || 0 : 0;
+            const countB = b.club ? clubCounts[b.club.trim()] || 0 : 0;
+            return countB - countA; // Descending
+        });
+
+        let foundSolution = false;
+
+        if (strictMode) {
+            // DFS Backtracking function
+            const solve = (teamIndex) => {
+                if (teamIndex === validTeams.length) return true; // All assigned
+
+                const team = validTeams[teamIndex];
+                const club = team.club ? team.club.trim() : "";
+
+                // Try placing in each group
+                // Shuffle group order to ensure randomness on multiple clicks
+                const groupIndices = Array.from({ length: numGroups }, (_, i) => i).sort(() => Math.random() - 0.5);
+
+                for (const gIdx of groupIndices) {
+                    const g = groups[gIdx];
+                    if (g.length >= teamsPerGroup) continue; // Full
+
+                    if (club) {
+                        const hasConflict = g.some(m => m.club && m.club.trim() === club);
+                        if (hasConflict) continue;
+                    }
+
+                    // Place team
+                    g.push(team);
+                    if (solve(teamIndex + 1)) return true;
+                    // Backtrack
+                    g.pop();
+                }
+                return false;
+            };
+
+            foundSolution = solve(0);
+        }
+
+        // Fallback or non-strict mode greedy assignment
+        if (!foundSolution) {
+            // Clear groups
+            for (let i = 0; i < numGroups; i++) groups[i] = [];
+            // Shuffle teams again for greedy
+            validTeams.sort(() => Math.random() - 0.5);
+
+            validTeams.forEach((team) => {
+                let candidateGroups = groups.map((g, idx) => ({ id: idx, members: g, count: g.length }))
+                    .filter(g => g.count < teamsPerGroup);
+
+                const club = team.club ? team.club.trim() : "";
+                let bestGroups = candidateGroups;
+
+                if (club) {
+                    const noConflictGroups = candidateGroups.filter(g => !g.members.some(m => m.club && m.club.trim() === club));
+                    if (noConflictGroups.length > 0) bestGroups = noConflictGroups;
+                }
+
+                bestGroups.sort((a, b) => a.count - b.count);
+                if (bestGroups.length > 0) groups[bestGroups[0].id].push(team);
+            });
+        }
+
+        // 4.5. Randomize positions WITHIN each group (so club teams aren't always 1st or 2nd)
+        groups.forEach(g => g.sort(() => Math.random() - 0.5));
 
         // 5. Update Grid
         const newGrid = [...gridData];
@@ -268,7 +531,295 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
         });
 
         setGridData(newGrid);
-        alert("✅ 스마트 배정 완료! (점수순 시드 + 클럽 분산)");
+        alert("✅ 조 구성 완료! (무작위 셔플 + 클럽 분산)");
+    };
+
+    const triggerLotteryAnimation = (onFrame, onComplete) => {
+        if (numGroups <= 0 || numTeams % numGroups !== 0) {
+            alert(`${numTeams}팀을 균등하게 나눌 수 있는 조 개수를 입력해주세요.`);
+            return;
+        }
+        if (!confirm(`조 추첨 룰렛을 시작하시겠습니까?\n(약 3초 후 자동으로 대진표가 생성됩니다)`)) {
+            return;
+        }
+
+        setIsProcessing(true);
+        setStatusMsg("조 추첨 룰렛 진행 중...");
+
+        let count = 0;
+        const maxFrames = 20; // 20 frames * 150ms = 3 seconds
+        let currentGrid = [...gridData];
+
+        const interval = setInterval(() => {
+            const validIdx = currentGrid.map((r, i) => i).filter(i => currentGrid[i].p1_name || currentGrid[i].club);
+            const validTeams = validIdx.map(i => ({ ...currentGrid[i], originalIdx: i }));
+
+            const tempGroups = Array.from({ length: numGroups }, () => []);
+            const teamsPerGroup = numTeams / numGroups;
+
+            // For intermediate animation frames, use fast greedy
+            if (count < maxFrames - 1) {
+                validTeams.sort(() => Math.random() - 0.5);
+                validTeams.forEach((team) => {
+                    let candidateGroups = tempGroups.map((g, idx) => ({ id: idx, members: g, count: g.length }))
+                        .filter(g => g.count < teamsPerGroup);
+                    const club = team.club ? team.club.trim() : "";
+                    let bestGroups = candidateGroups;
+
+                    if (club) {
+                        const noConflict = candidateGroups.filter(g => !g.members.some(m => m.club && m.club.trim() === club));
+                        if (noConflict.length > 0) bestGroups = noConflict;
+                    }
+
+                    bestGroups.sort((a, b) => a.count - b.count);
+                    if (bestGroups.length > 0) tempGroups[bestGroups[0].id].push(team);
+                });
+            } else {
+                // For the very last frame, use STRICT backtracking algorithm
+                const clubCounts = {};
+                validTeams.forEach(t => {
+                    const c = t.club ? t.club.trim() : "";
+                    if (c) clubCounts[c] = (clubCounts[c] || 0) + 1;
+                });
+
+                validTeams.sort((a, b) => {
+                    const countA = a.club ? clubCounts[a.club.trim()] || 0 : 0;
+                    const countB = b.club ? clubCounts[b.club.trim()] || 0 : 0;
+                    return countB - countA;
+                });
+
+                const maxSingleClub = Object.values(clubCounts).reduce((m, v) => Math.max(m, v), 0);
+                const strictMode = maxSingleClub <= numGroups;
+                let foundSolution = false;
+
+                if (strictMode) {
+                    const solve = (teamIndex) => {
+                        if (teamIndex === validTeams.length) return true;
+                        const team = validTeams[teamIndex];
+                        const club = team.club ? team.club.trim() : "";
+                        const groupIndices = Array.from({ length: numGroups }, (_, i) => i).sort(() => Math.random() - 0.5);
+
+                        for (const gIdx of groupIndices) {
+                            const g = tempGroups[gIdx];
+                            if (g.length >= teamsPerGroup) continue;
+                            if (club && g.some(m => m.club && m.club.trim() === club)) continue;
+
+                            g.push(team);
+                            if (solve(teamIndex + 1)) return true;
+                            g.pop();
+                        }
+                        return false;
+                    };
+                    foundSolution = solve(0);
+                }
+
+                // Fallback greedy
+                if (!foundSolution) {
+                    for (let i = 0; i < numGroups; i++) tempGroups[i] = [];
+                    validTeams.sort(() => Math.random() - 0.5);
+                    validTeams.forEach((team) => {
+                        let candidateGroups = tempGroups.map((g, idx) => ({ id: idx, members: g, count: g.length }))
+                            .filter(g => g.count < teamsPerGroup);
+                        const club = team.club ? team.club.trim() : "";
+                        let bestGroups = candidateGroups;
+
+                        if (club) {
+                            const noConflict = candidateGroups.filter(g => !g.members.some(m => m.club && m.club.trim() === club));
+                            if (noConflict.length > 0) bestGroups = noConflict;
+                        }
+
+                        bestGroups.sort((a, b) => a.count - b.count);
+                        if (bestGroups.length > 0) tempGroups[bestGroups[0].id].push(team);
+                    });
+                }
+            }
+
+            tempGroups.forEach(g => g.sort(() => Math.random() - 0.5));
+
+            const newGrid = [...currentGrid];
+            tempGroups.forEach((g, gIdx) => {
+                g.forEach(team => {
+                    newGrid[team.originalIdx] = { ...newGrid[team.originalIdx], group: `${gIdx + 1}조` };
+                });
+            });
+
+            currentGrid = newGrid;
+            setGridData(newGrid); // Update UI visually
+
+            // ----- PREVIEW DATA FOR STANDINGS (since actual data is not uploaded yet) -----
+            const validRows = newGrid.filter(r => r.p1_name && r.p2_name);
+            const previewTeams = validRows.map((r, idx) => ({
+                id: `t${idx + 1}`,
+                name: `${r.p1_name}/${r.p2_name}`,
+                club: r.club,
+                initial_group: r.group
+            }));
+            const previewGroups = {};
+            previewTeams.forEach(t => {
+                if (!previewGroups[t.initial_group]) previewGroups[t.initial_group] = [];
+                previewGroups[t.initial_group].push(t.id);
+            });
+
+            if (onFrame) onFrame(previewTeams, previewGroups);
+
+            count++;
+            if (count >= maxFrames) {
+                clearInterval(interval);
+                handleGenerate(true).then(() => {
+                    if (onComplete) onComplete();
+                });
+            }
+        }, 150);
+    };
+
+    const handleClearGroups = () => {
+        if (confirm("모든 조 배정 결과를 초기화하시겠습니까?")) {
+            drawOrderRef.current = 0;
+            setGridData(gridData.map(r => ({ ...r, group: '', drawOrder: undefined })));
+        }
+    };
+
+    const handleSeedLottery = (seedVal) => {
+        // Find all currently unassigned valid teams
+        const unassignedValidTeams = gridData.map((r, i) => ({ ...r, originalIdx: i }))
+            .filter(r => !r.group && (r.p1_name || r.club));
+
+        if (unassignedValidTeams.length === 0) {
+            alert(`남아있는 팀이 없습니다. 모든 팀이 조에 배정되었습니다.`);
+            return;
+        }
+
+        // We want to divide the total number of valid teams into 4 buckets.
+        // E.g., if total valid teams is 48, each bucket gets 12.
+        const totalValidTeams = gridData.filter(r => (r.p1_name || r.club)).length;
+        const bucketSize = Math.ceil(totalValidTeams / 4);
+
+        // We only draw up to bucketSize teams at a time.
+        // First, randomly shuffle the remaining unassigned teams (Fisher-Yates shuffle)
+        for (let i = unassignedValidTeams.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [unassignedValidTeams[i], unassignedValidTeams[j]] = [unassignedValidTeams[j], unassignedValidTeams[i]];
+        }
+
+        // Take exactly bucketSize teams for this seed's turn (or fewer if not enough left)
+        const seedTeams = unassignedValidTeams.slice(0, bucketSize);
+
+        // Group currently assigned teams
+        const currentGroups = Array.from({ length: numGroups }, () => []);
+        gridData.forEach((r, i) => {
+            if (r.group) {
+                const gNum = parseInt(r.group.replace('조', '')) - 1;
+                if (gNum >= 0 && gNum < numGroups) currentGroups[gNum].push({ ...r, originalIdx: i });
+            }
+        });
+
+        const newGrid = [...gridData];
+        // Assign to groups, perfectly balancing group size and guaranteeing zero club conflicts (if mathematically possible)
+        // by actively building valid assignments with a Randomized Greedy search (1000 retries).
+
+        // Ensure size balance by creating exactly the slots needed to evenly distribute members
+        const slots = [];
+        let currentGroupSizes = currentGroups.map((g, idx) => ({ idx, count: g.length }));
+
+        for (let i = 0; i < seedTeams.length; i++) {
+            currentGroupSizes.sort((a, b) => a.count - b.count);
+            currentGroupSizes[0].count++;
+            slots.push(currentGroupSizes[0].idx);
+        }
+
+        let bestAssignment = null;
+        let minConflicts = Infinity;
+        const maxRetries = 1000;
+
+        for (let attempt = 0; attempt < maxRetries; attempt++) {
+            let currentSlots = [...slots];
+            let attemptAssignment = []; // stores { origIndex, gIdx }
+            let currentConflicts = 0;
+
+            // Randomize the order we place the teams in this attempt to avoid getting stuck
+            let teamsToAssign = seedTeams.map((t, i) => ({ team: t, origIndex: i }));
+            for (let i = teamsToAssign.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [teamsToAssign[i], teamsToAssign[j]] = [teamsToAssign[j], teamsToAssign[i]];
+            }
+
+            for (let i = 0; i < teamsToAssign.length; i++) {
+                const { team, origIndex } = teamsToAssign[i];
+                const club = team.club ? team.club.trim() : "";
+
+                let validSlots = [];
+                let conflictSlots = [];
+
+                for (let j = 0; j < currentSlots.length; j++) {
+                    const gIdx = currentSlots[j];
+                    let hasConflict = false;
+
+                    if (club) {
+                        // Check against existing members in this group
+                        hasConflict = currentGroups[gIdx].some(m => m.club && m.club.trim() === club);
+
+                        if (!hasConflict) {
+                            // Check against successfully placed teams in this same attempt
+                            for (let k = 0; k < attemptAssignment.length; k++) {
+                                if (attemptAssignment[k].gIdx === gIdx) {
+                                    const assignedTeam = seedTeams[attemptAssignment[k].origIndex];
+                                    const otherClub = assignedTeam.club ? assignedTeam.club.trim() : "";
+                                    if (otherClub === club) {
+                                        hasConflict = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if (hasConflict) {
+                        conflictSlots.push(j);
+                    } else {
+                        validSlots.push(j);
+                    }
+                }
+
+                // Prioritize picking a valid (conflict-free) slot available for this team!
+                if (validSlots.length > 0) {
+                    const pickIdx = validSlots[Math.floor(Math.random() * validSlots.length)];
+                    attemptAssignment.push({ origIndex, gIdx: currentSlots[pickIdx] });
+                    currentSlots.splice(pickIdx, 1);
+                } else {
+                    // Fallback: forced to pick a conflict slot
+                    const pickIdx = conflictSlots[Math.floor(Math.random() * conflictSlots.length)];
+                    attemptAssignment.push({ origIndex, gIdx: currentSlots[pickIdx] });
+                    currentSlots.splice(pickIdx, 1);
+                    currentConflicts++;
+                }
+            }
+
+            // If this attempt resulted in fewer conflicts than our best so far, save it
+            if (currentConflicts < minConflicts) {
+                minConflicts = currentConflicts;
+                attemptAssignment.sort((a, b) => a.origIndex - b.origIndex);
+                bestAssignment = attemptAssignment.map(a => a.gIdx);
+
+                if (minConflicts === 0) break; // Found perfect match, exit early!
+            }
+        }
+
+        // Apply best found assignment
+        for (let i = 0; i < seedTeams.length; i++) {
+            const team = seedTeams[i];
+            const bestGIdx = bestAssignment[i];
+            currentGroups[bestGIdx].push(team);
+            newGrid[team.originalIdx].group = `${bestGIdx + 1}조`;
+            newGrid[team.originalIdx].drawOrder = ++drawOrderRef.current;
+        }
+
+        setGridData(newGrid);
+        if (minConflicts > 0) {
+            setStatusMsg(`⚠️ 배정 완료: 클럽 중복을 피할 수 없어 ${minConflicts}건의 중복이 발생했습니다.`);
+        } else {
+            setStatusMsg(`✅ 추첨 완료! 랜덤하게 ${seedTeams.length}팀이 완벽 배정되었습니다.`);
+        }
+        setTimeout(() => setStatusMsg(""), 5000);
     };
 
     const handleReset = async () => {
@@ -359,6 +910,15 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                         <button className={`tab-btn ${activeTab === 'grouping' ? 'active' : ''}`} onClick={() => setActiveTab('grouping')}>
                             👥 참가자 명단 (Grid)
                         </button>
+                        <button className={`tab-btn ${activeTab === 'standings' ? 'active' : ''}`} onClick={() => setActiveTab('standings')}>
+                            📊 조별 순위 및 추첨
+                        </button>
+                        <button className={`tab-btn ${activeTab === 'qrcode' ? 'active' : ''}`} onClick={() => setActiveTab('qrcode')}>
+                            📱 QR 출입증 인쇄
+                        </button>
+                        <button className={`tab-btn ${activeTab === 'manage' ? 'active' : ''}`} onClick={() => setActiveTab('manage')}>
+                            🎾 경기 결과 관리
+                        </button>
                     </div>
 
                     <div className="glass-card setup-card">
@@ -397,9 +957,9 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                                             <button
                                                 className="modern-button secondary"
                                                 onClick={handleSmartAssign}
-                                                title="점수순 시드 배정 + 클럽 분산 배정"
+                                                title="클럽 분산 무작위 자동 배정"
                                             >
-                                                ⚡ 스마트 배정
+                                                🔀 조 구성 셔플 배정
                                             </button>
                                         </div>
                                         <p className="field-hint">전체 참가팀을 나눌 조의 개수입니다.</p>
@@ -421,10 +981,10 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                                     <div className="excel-actions">
                                         <button
                                             className="mini-btn"
-                                            style={{ backgroundColor: '#9c27b0', color: 'white' }}
+                                            style={{ backgroundColor: '#ff9800', color: 'white' }}
                                             onClick={handleSmartAssign}
                                         >
-                                            ⚡ 스마트 배정 ({numGroups}개)
+                                            🔀 조 구성 다시하기 (클럽분산)
                                         </button>
                                         <button onClick={handleExcelDownload} className="mini-btn success">📥 엑셀 양식 다운</button>
                                         <label className="mini-btn info" style={{ cursor: 'pointer' }}>
@@ -438,40 +998,249 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                                     <div className="grid-header-row">
                                         <div className="gh-cell w-num">No</div>
                                         <div className="gh-cell w-group">조</div>
+                                        <div className="gh-cell w-name">참가자A</div>
+                                        <div className="gh-cell w-name">참가자B</div>
                                         <div className="gh-cell w-club">클럽</div>
-                                        <div className="gh-cell w-name">이름1</div>
-                                        <div className="gh-cell w-gender">성별</div>
-                                        <div className="gh-cell w-score">점수</div>
-                                        <div className="gh-cell w-name">이름2</div>
-                                        <div className="gh-cell w-gender">성별</div>
-                                        <div className="gh-cell w-score">점수</div>
-                                        <div className="gh-cell w-total">합계</div>
+                                        <div className="gh-cell w-group">합산나이</div>
                                     </div>
                                     <div className="grid-body">
                                         {gridData.map((row, idx) => (
                                             <div key={idx} className="grid-row">
                                                 <div className="gc-cell w-num">{idx + 1}</div>
                                                 <input type="text" className="gc-input w-group" placeholder="조" value={row.group} onChange={(e) => handleGridChange(idx, 'group', e.target.value)} />
+                                                <input type="text" className="gc-input w-name" placeholder="참가자A" value={row.p1_name} onChange={(e) => handleGridChange(idx, 'p1_name', e.target.value)} />
+                                                <input type="text" className="gc-input w-name" placeholder="참가자B" value={row.p2_name} onChange={(e) => handleGridChange(idx, 'p2_name', e.target.value)} />
                                                 <input type="text" className="gc-input w-club" placeholder="클럽" value={row.club} onChange={(e) => handleGridChange(idx, 'club', e.target.value)} />
-                                                <input type="text" className="gc-input w-name" placeholder="이름1" value={row.p1_name} onChange={(e) => handleGridChange(idx, 'p1_name', e.target.value)} />
-                                                <input type="text" className="gc-input w-gender" placeholder="성" value={row.p1_gender} onChange={(e) => handleGridChange(idx, 'p1_gender', e.target.value)} />
-                                                <input type="text" className="gc-input w-score" placeholder="점" value={row.p1_score} onChange={(e) => handleGridChange(idx, 'p1_score', e.target.value)} />
-                                                <input type="text" className="gc-input w-name" placeholder="이름2" value={row.p2_name} onChange={(e) => handleGridChange(idx, 'p2_name', e.target.value)} />
-                                                <input type="text" className="gc-input w-gender" placeholder="성" value={row.p2_gender} onChange={(e) => handleGridChange(idx, 'p2_gender', e.target.value)} />
-                                                <input type="text" className="gc-input w-score" placeholder="점" value={row.p2_score} onChange={(e) => handleGridChange(idx, 'p2_score', e.target.value)} />
-                                                <input type="text" className="gc-input w-total" placeholder="합" value={row.total_score} onChange={(e) => handleGridChange(idx, 'total_score', e.target.value)} />
+                                                <input type="number" className="gc-input w-group" placeholder="나이" value={row.age} onChange={(e) => handleGridChange(idx, 'age', e.target.value)} />
                                             </div>
                                         ))}
                                     </div>
                                 </div>
 
-                                <div className="action-buttons">
-                                    <button onClick={handleGenerate} disabled={isProcessing} className="modern-button primary">
-                                        ▶️ 대진표 생성 및 시작
+                                <div className="card-header" style={{ marginTop: '20px' }}>
+                                    <h3>🚀 대회 대진표 확정 및 컨트롤</h3>
+                                </div>
+
+                                <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                                    <button
+                                        className="modern-button primary"
+                                        onClick={handleGenerate}
+                                        disabled={isProcessing}
+                                        style={{ flex: 1, minWidth: '200px' }}
+                                    >
+                                        ▶️ 1. 예선 대진표 생성 및 시작
                                     </button>
-                                    <button onClick={handleReset} disabled={isProcessing} className="modern-button danger">
-                                        🗑️ 대회 초기화
+                                    <button
+                                        className="modern-button"
+                                        onClick={handleGenerateKnockout32}
+                                        disabled={isProcessing}
+                                        style={{ flex: 1, minWidth: '200px', backgroundColor: '#e91e63' }}
+                                    >
+                                        👑 2. 본선 32강 대진표 생성 (고정 대진표)
                                     </button>
+
+                                    <button
+                                        className="modern-button danger"
+                                        onClick={handleReset}
+                                        disabled={isProcessing}
+                                        style={{ width: 'auto' }}
+                                    >
+                                        🗑️ 초기화
+                                    </button>
+                                    <button
+                                        className="modern-button info"
+                                        onClick={fillMockData}
+                                        style={{ width: 'auto' }}
+                                    >
+                                        🧪 [검증용] 48팀 모의 데이터 채우기
+                                    </button>
+                                    <button
+                                        className="modern-button info"
+                                        onClick={handleFastForwardGroups}
+                                        style={{ width: 'auto' }}
+                                    >
+                                        ⏩ [검증용] 예선전 전부 치트 승패 처리
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB 3: GROUP STANDINGS & LOTTERY */}
+                        {activeTab === 'standings' && (
+                            <div className="tab-content fade-in">
+                                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <h3><span className="icon-gap">📊</span> 조별 현황 및 시드 추첨</h3>
+                                </div>
+                                <p className="card-desc">아래 버튼을 순차적으로 눌러 무작위 시드별로 팀을 조에 배정합니다. 배정 현황은 아래 표에 실시간으로 표시됩니다.</p>
+
+                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '15px 0 25px 0' }}>
+                                    {[1, 2, 3, 4].map(s => (
+                                        <button key={s} className="modern-button secondary" onClick={() => handleSeedLottery(s)} style={{ padding: '0.6rem 1rem', fontSize: '0.9rem' }}>
+                                            🎱 시드 {s} 추첨
+                                        </button>
+                                    ))}
+                                    <button className="modern-button danger" onClick={handleClearGroups} style={{ padding: '0.6rem 1rem', fontSize: '0.9rem', flex: 'none', marginLeft: 'auto' }}>
+                                        🧹 조 배정 초기화
+                                    </button>
+                                </div>
+
+                                <div className="groups-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '15px' }}>
+                                    {Array.from({ length: numGroups }).map((_, gIdx) => {
+                                        const groupName = `${gIdx + 1}조`;
+                                        const groupMembers = gridData
+                                            .filter(r => r.group === groupName)
+                                            .sort((a, b) => (a.drawOrder ?? 0) - (b.drawOrder ?? 0));
+                                        return (
+                                            <div key={gIdx} className="glass-card" style={{ padding: '15px' }}>
+                                                <h4 style={{ margin: '0 0 10px 0', color: 'var(--tennis-yellow)', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '5px' }}>{groupName}</h4>
+                                                {groupMembers.length === 0 ? (
+                                                    <p style={{ color: '#666', fontSize: '0.9rem', fontStyle: 'italic', margin: 0 }}>비어있음</p>
+                                                ) : (
+                                                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                                                        {groupMembers.map((m, mIdx) => (
+                                                            <li key={mIdx} style={{ fontSize: '0.9rem', marginBottom: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                                <span>{m.p1_name}/{m.p2_name}</span>
+                                                                {m.club && <span style={{ fontSize: '0.8rem', color: '#aaa', backgroundColor: 'rgba(255,255,255,0.1)', padding: '2px 6px', borderRadius: '4px' }}>{m.club}</span>}
+                                                            </li>
+                                                        ))}
+                                                    </ul>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'center', marginTop: '25px' }}>
+                                    <button
+                                        onClick={handleGenerate}
+                                        disabled={isProcessing}
+                                        style={{
+                                            padding: '14px 40px',
+                                            fontSize: '1.1rem',
+                                            fontWeight: '900',
+                                            background: isProcessing ? '#555' : 'linear-gradient(135deg, #d5ff00, #a8c800)',
+                                            color: '#111',
+                                            borderRadius: '12px',
+                                            boxShadow: '0 4px 20px rgba(213,255,0,0.35)',
+                                            border: 'none',
+                                            cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                            transition: 'transform 0.1s'
+                                        }}
+                                        onMouseDown={(e) => !isProcessing && (e.currentTarget.style.transform = 'scale(0.97)')}
+                                        onMouseUp={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                                        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+                                    >
+                                        {isProcessing ? '⏳ 저장 중...' : '💾 추첨 저장 및 예선 대진표 생성'}
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB 4: QR CODE GENERATOR */}
+                        {activeTab === 'qrcode' && (
+                            <div className="tab-content fade-in">
+                                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <h3><span className="icon-gap">📱</span> 코트별 점수 입력 QR 코드 ({numCourts}개)</h3>
+                                    <button
+                                        className="modern-button primary"
+                                        style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
+                                        onClick={() => window.print()}
+                                    >
+                                        🖨️ 인쇄하기
+                                    </button>
+                                </div>
+                                <p className="card-desc">아래의 QR 코드를 인쇄하여 각 코트에 부착하세요. 승리팀이 스마트폰으로 스캔하여 점수를 즉시 등록할 수 있습니다.</p>
+
+                                <div className="qr-grid">
+                                    {Array.from({ length: numCourts }).map((_, i) => {
+                                        const courtNum = i + 1;
+                                        // Generate absolute URL for the QR code based on current domain
+                                        const qrUrl = `${window.location.origin}/score/${courtNum}`;
+                                        return (
+                                            <div key={courtNum} className="qr-card">
+                                                <h4>Court {courtNum}</h4>
+                                                <div className="qr-wrapper">
+                                                    <QRCodeSVG value={qrUrl} size={150} level={"H"} />
+                                                </div>
+                                                <p className="qr-url">{qrUrl}</p>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* TAB 4: MATCH MANAGEMENT */}
+                        {activeTab === 'manage' && (
+                            <div className="tab-content fade-in">
+                                <div className="card-header">
+                                    <h3><span className="icon-gap">🎾</span> 경기 결과 관리</h3>
+                                </div>
+                                <p className="card-desc">운영자가 직접 점수(+/-)나 경기 상태를 변경할 수 있습니다. 변경된 점수는 대진표 모니터에 실시간 반영됩니다.</p>
+
+                                {/* Manage Sub-Tabs */}
+                                <div className="manage-tabs" style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '1rem', marginTop: '1rem' }}>
+                                    {['전체', '예선 조별리그', '본선 32강', '16강', '8강', '4강', '결승'].map(tab => (
+                                        <button
+                                            key={tab}
+                                            onClick={() => setActiveManageTab(tab)}
+                                            style={{
+                                                padding: '6px 12px',
+                                                background: activeManageTab === tab ? 'var(--tennis-yellow)' : 'rgba(0,0,0,0.3)',
+                                                color: activeManageTab === tab ? 'black' : '#ccc',
+                                                border: activeManageTab === tab ? '1px solid var(--tennis-yellow)' : '1px solid #444',
+                                                borderRadius: '20px',
+                                                cursor: 'pointer',
+                                                fontSize: '0.9rem',
+                                                fontWeight: activeManageTab === tab ? 'bold' : 'normal',
+                                                transition: 'all 0.2s'
+                                            }}
+                                        >
+                                            {tab}
+                                        </button>
+                                    ))}
+                                </div>
+
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                    {[...data.matches]
+                                        .filter(m => {
+                                            if (activeManageTab === '전체') return true;
+                                            if (activeManageTab === '예선 조별리그') return typeof m.group_id === 'number' || (typeof m.group_id === 'string' && m.group_id.includes('조'));
+                                            if (activeManageTab === '16강') return m.group_id === '본선 16강 (무작위)' || m.group_id === '16강';
+                                            return m.group_id === activeManageTab;
+                                        })
+                                        .sort((a, b) => {
+                                            // 1. Sort by Status (LIVE > PENDING > COMPLETED)
+                                            const statusOrder = { 'LIVE': 1, 'PENDING': 2, 'SCHEDULED': 2, 'COMPLETED': 3 };
+                                            const sA = statusOrder[a.status] || 4;
+                                            const sB = statusOrder[b.status] || 4;
+                                            if (sA !== sB) return sA - sB;
+
+                                            // 2. Sort by Group/Round
+                                            if (a.group_id !== b.group_id) {
+                                                const parseGroup = g => parseInt(String(g).replace(/[^0-9]/g, '') || 999);
+                                                return parseGroup(a.group_id) - parseGroup(b.group_id);
+                                            }
+                                            return a.round - b.round;
+                                        })
+                                        .map(match => {
+                                            const getTeam = (id) => data.teams.find(t => t.id === id) || { id: 'TBD', name: 'TBD', player1: '', player2: '' };
+                                            return (
+                                                <MatchCard
+                                                    key={match.id}
+                                                    match={match}
+                                                    teamA={getTeam(match.team_a_id)}
+                                                    teamB={getTeam(match.team_b_id)}
+                                                    isAdmin={true}
+                                                    allMatches={data.matches}
+                                                />
+                                            );
+                                        })}
+                                    {data.matches.length === 0 && (
+                                        <div style={{ padding: '2rem', textAlign: 'center', color: '#888' }}>
+                                            생성된 경기가 없습니다. [대회 운영 설정] 탭에서 대진표를 먼저 생성해주세요.
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         )}
@@ -520,6 +1289,77 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                 .tab-btn.active { background: var(--tennis-yellow); color: black; border-color: var(--tennis-yellow); box-shadow: 0 0 15px rgba(213, 255, 0, 0.3); }
                 
                 .glass-card { background: rgba(30, 30, 30, 0.6); backdrop-filter: blur(10px); border-radius: 16px; padding: 1.5rem; border: 1px solid rgba(255, 255, 255, 0.05); box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2); }
+                
+                /* QR Grid Specifics */
+                .qr-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+                .qr-card { background: white; padding: 1rem; border-radius: 12px; text-align: center; color: black; box-shadow: 0 4px 10px rgba(0,0,0,0.3); }
+                .qr-card h4 { margin: 0 0 10px 0; font-size: 1.2rem; color: #333; }
+                .qr-wrapper { background: white; padding: 10px; display: inline-block; }
+                .qr-url { margin-top: 10px; font-size: 0.7rem; color: #666; word-break: break-all; }
+                
+                /* Print Styles */
+                @media print {
+                    @page { size: A4 portrait; margin: 0; }
+                    /* Hide non-printable elements */
+                    .dashboard-header, .tab-navigation, .card-header, .card-desc, .right-col, button, .status-badge {
+                        display: none !important;
+                    }
+                    
+                    /* Reset layouts to allow natural page flow */
+                    body, .dashboard-container, .dashboard-grid, .left-col, .glass-card, .tab-content {
+                        display: block !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: white !important;
+                        border: none !important;
+                        box-shadow: none !important;
+                        width: 100% !important;
+                        height: 100% !important;
+                    }
+
+                    .qr-grid { 
+                        display: block !important; 
+                        padding: 0 !important; 
+                        margin: 0 !important;
+                    }
+                    
+                    .qr-card { 
+                        display: flex !important;
+                        flex-direction: column !important;
+                        justify-content: center !important;
+                        align-items: center !important;
+                        width: 100vw !important;
+                        height: 98vh !important;
+                        page-break-after: always;
+                        page-break-inside: avoid;
+                        border: none !important; 
+                        box-shadow: none !important; 
+                        color: black !important;
+                        background: white !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        box-sizing: border-box !important;
+                    }
+                    
+                    .qr-card h4 {
+                        font-size: 5rem !important;
+                        margin-bottom: 2rem !important;
+                    }
+
+                    .qr-wrapper {
+                        padding: 0 !important;
+                    }
+
+                    .qr-wrapper svg {
+                        width: 500px !important;
+                        height: 500px !important;
+                    }
+
+                    .qr-url {
+                        display: none !important;
+                    }
+                }
+
                 .card-header { margin-bottom: 1.5rem; border-bottom: 1px solid rgba(255, 255, 255, 0.05); padding-bottom: 0.5rem; }
                 .card-header h3 { margin: 0; font-size: 1.2rem; color: var(--tennis-yellow); display: flex; align-items: center; }
                 
@@ -553,8 +1393,6 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
                 .w-club { width: 100px; flex-shrink: 0; border-right: 1px solid rgba(255,255,255,0.05); }
                 .w-name { flex: 1; min-width: 80px; border-right: 1px solid rgba(255,255,255,0.05); }
                 .w-gender { width: 50px; flex-shrink: 0; border-right: 1px solid rgba(255,255,255,0.05); }
-                .w-score { width: 50px; flex-shrink: 0; border-right: 1px solid rgba(255,255,255,0.05); }
-                .w-total { width: 60px; flex-shrink: 0; }
 
                 .excel-actions { display: flex; gap: 10px; }
                 .mini-btn { padding: 5px 10px; font-size: 0.8rem; border-radius: 4px; border: none; cursor: pointer; color: white; display: inline-block; }
@@ -574,6 +1412,6 @@ const AdminDashboardNew = ({ data, onUpdateData, isAdmin, onLogin }) => {
             `}</style>
         </div>
     );
-};
+});
 
 export default AdminDashboardNew;

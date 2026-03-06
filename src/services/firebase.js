@@ -123,9 +123,22 @@ export const updateMatch = async (matchId, updates) => {
     }
 };
 
+export const updateCourt = async (courtId, updates) => {
+    try {
+        const courtRef = doc(db, COLLECTIONS.COURTS, String(courtId));
+        await setDoc(courtRef, updates, { merge: true });
+    } catch (error) {
+        console.error("Error updating court: ", error);
+        throw error;
+    }
+};
+
 export const resetTournamentData = async () => {
     try {
         console.log("Starting full reset...");
+        // Clear local notification persistence so new tournaments can ring alarms
+        localStorage.removeItem('notifiedMatchesList');
+
         const batch = writeBatch(db);
 
         // 1. Get all documents

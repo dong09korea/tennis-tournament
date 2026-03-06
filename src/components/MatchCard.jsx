@@ -1,7 +1,8 @@
 import React from 'react';
-import { updateMatch } from '../services/firebase';
+import { updateMatch, updateCourt, uploadData } from '../services/firebase';
+import { updateTournamentProgression } from '../utils/tournamentLogic';
 
-const MatchCard = ({ match, teamA, teamB, isAdmin }) => {
+const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
   const isCompleted = match.status === 'COMPLETED';
   const isLive = match.status === 'LIVE';
 
@@ -14,6 +15,16 @@ const MatchCard = ({ match, teamA, teamB, isAdmin }) => {
 
   const winnerId = match.winner_id;
 
+  const getRankLabel = (team) => {
+    if (!team || team.id === 'BYE' || team.id === 'TBD') return null;
+    if (team.groupRank && team.initial_group) {
+      return `${String(team.initial_group).replace(/조/g, '')}조 ${team.groupRank}위`;
+    }
+    return null;
+  };
+
+  const isKnockout = typeof match.group_id === 'string' && match.group_id.includes('본선');
+
   const handleScore = async (team, delta) => {
     const field = team === 'A' ? 'score_a' : 'score_b';
     const newScore = Math.max(0, (match[field] || 0) + delta);
@@ -22,16 +33,48 @@ const MatchCard = ({ match, teamA, teamB, isAdmin }) => {
 
   const handleStatus = async (newStatus) => {
     let updates = { status: newStatus };
+    let newWinnerId = null;
+
     if (newStatus === 'COMPLETED') {
       // Simple logic: higher score wins
       const scoreA = match.score_a || 0;
       const scoreB = match.score_b || 0;
-      if (scoreA > scoreB) updates.winner_id = match.team_a_id;
-      else if (scoreB > scoreA) updates.winner_id = match.team_b_id;
+      if (scoreA > scoreB) newWinnerId = match.team_a_id;
+      else if (scoreB > scoreA) newWinnerId = match.team_b_id;
+
+      updates.winner_id = newWinnerId;
+
+      // Free the court if the match was assigned to one
+      if (match.court_id) {
+        try { await updateCourt(parseInt(match.court_id), { match_id: null }); } catch (e) { console.error('Error freeing court:', e); }
+      }
     } else {
       updates.winner_id = null; // Reset winner if not completed
     }
+
     await updateMatch(match.id, updates);
+
+    // If completed by admin and we have allMatches passed, trigger auto-advancement
+    if (newStatus === 'COMPLETED' && newWinnerId && allMatches) {
+      const tempMatches = allMatches.map(m => m.id === match.id ? { ...m, ...updates } : m);
+      const nextMatches = updateTournamentProgression(tempMatches, match.id, newWinnerId);
+      // Only upload if something actually changed to avoid unnecessary writes
+      if (JSON.stringify(tempMatches) !== JSON.stringify(nextMatches)) {
+        // We just need to update the entire matches array in FB
+        // Rather than a full uploadData, doing it here is fine since uploadData takes { matches }
+        // Let's create a minimal payload that won't break uploadData (it needs teams, groups etc normally)
+        // Wait, uploadData loops over the provided keys. Let's just update the specific changed matches to be efficient, or just call uploadData with the matches array.
+        // Actually, updating just the next match document is much safer here.
+
+        const nextMatch = nextMatches.find(m => m.id === match.next_match_id);
+        if (nextMatch) {
+          await updateMatch(nextMatch.id, {
+            team_a_id: nextMatch.team_a_id,
+            team_b_id: nextMatch.team_b_id
+          });
+        }
+      }
+    }
   };
 
   const adminBtnStyle = {
@@ -70,42 +113,85 @@ const MatchCard = ({ match, teamA, teamB, isAdmin }) => {
       </div>
 
       <div className="team-row">
-        <div className="team-info">
-          <span className={`team-name ${winnerId === teamA.id ? 'winner' : ''}`}>
-            {teamA.name}
-          </span>
-          <span className="team-players">
-            {teamA.player1}, {teamA.player2}
-          </span>
+        <div className="team-side" style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+          {isKnockout && getRankLabel(teamA) && (
+            <div className="team-rank-box">{getRankLabel(teamA)}</div>
+          )}
+          <div className="team-info">
+            <span className={`team-name ${winnerId === teamA.id ? 'winner' : ''}`}>
+              {teamA.name}
+            </span>
+            {teamA.id !== 'TBD' && teamA.id !== 'BYE' && teamA.club && (
+              <span className="team-club">
+                {teamA.club}
+              </span>
+            )}
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          {isAdmin && <button onClick={() => handleScore('A', -1)} style={adminBtnStyle}>-</button>}
+          {isAdmin && teamA.id !== 'TBD' && teamA.id !== 'BYE' && <button onClick={() => handleScore('A', -1)} style={adminBtnStyle}>-</button>}
           <div className="score" style={getScoreStyle(winnerId === teamA.id)}>
-            {match.score_a}
+            {teamA.id === 'TBD' || teamA.id === 'BYE' ? '-' : match.score_a}
           </div>
-          {isAdmin && <button onClick={() => handleScore('A', 1)} style={adminBtnStyle}>+</button>}
+          {isAdmin && teamA.id !== 'TBD' && teamA.id !== 'BYE' && <button onClick={() => handleScore('A', 1)} style={adminBtnStyle}>+</button>}
         </div>
       </div>
 
       <div className="divider"></div>
 
       <div className="team-row">
-        <div className="team-info">
-          <span className={`team-name ${winnerId === teamB.id ? 'winner' : ''}`}>
-            {teamB.name}
-          </span>
-          <span className="team-players">
-            {teamB.player1}, {teamB.player2}
-          </span>
+        <div className="team-side" style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
+          {isKnockout && getRankLabel(teamB) && (
+            <div className="team-rank-box">{getRankLabel(teamB)}</div>
+          )}
+          <div className="team-info">
+            <span className={`team-name ${winnerId === teamB.id ? 'winner' : ''}`}>
+              {teamB.name}
+            </span>
+            {teamB.id !== 'TBD' && teamB.id !== 'BYE' && teamB.club && (
+              <span className="team-club">
+                {teamB.club}
+              </span>
+            )}
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          {isAdmin && <button onClick={() => handleScore('B', -1)} style={adminBtnStyle}>-</button>}
+          {isAdmin && teamB.id !== 'TBD' && teamB.id !== 'BYE' && <button onClick={() => handleScore('B', -1)} style={adminBtnStyle}>-</button>}
           <div className="score" style={getScoreStyle(winnerId === teamB.id)}>
-            {match.score_b}
+            {teamB.id === 'TBD' || teamB.id === 'BYE' ? '-' : match.score_b}
           </div>
-          {isAdmin && <button onClick={() => handleScore('B', 1)} style={adminBtnStyle}>+</button>}
+          {isAdmin && teamB.id !== 'TBD' && teamB.id !== 'BYE' && <button onClick={() => handleScore('B', 1)} style={adminBtnStyle}>+</button>}
         </div>
       </div>
+
+      {/* Live Tiebreak Indicator: knockout match LIVE at 5:5 */}
+      {isLive && match.score_a === 5 && match.score_b === 5 &&
+        typeof match.group_id === 'string' && !/^\d+조$/.test(match.group_id) && (
+          <div className="tb-row tb-live">
+            <span className="tb-label">🎾 TB</span>
+            <span style={{ color: '#88ddff', fontSize: '0.88rem', fontWeight: '700' }}>타이브레이크 진행 중...</span>
+          </div>
+        )}
+
+      {/* Completed Tiebreak Result */}
+      {isCompleted && match.tb_score_a !== undefined && match.tb_score_a !== null &&
+        match.tb_score_b !== undefined && match.tb_score_b !== null && (
+          <div className="tb-row">
+            <span className="tb-label">🎾 TB</span>
+            <span className="tb-scores">
+              <span style={{ color: winnerId === (match.team_a_id) ? 'var(--tennis-yellow)' : '#aaa', fontWeight: winnerId === match.team_a_id ? '800' : '400' }}>
+                {match.tb_score_a}
+              </span>
+              <span style={{ color: '#555', margin: '0 4px' }}>:</span>
+              <span style={{ color: winnerId === (match.team_b_id) ? 'var(--tennis-yellow)' : '#aaa', fontWeight: winnerId === match.team_b_id ? '800' : '400' }}>
+                {match.tb_score_b}
+              </span>
+            </span>
+            <span className="tb-winner">
+              {winnerId === match.team_a_id ? `${teamA.name} 승 🏆` : winnerId === match.team_b_id ? `${teamB.name} 승 🏆` : ''}
+            </span>
+          </div>
+        )}
 
       <style>{`
         .match-card {
@@ -168,9 +254,10 @@ const MatchCard = ({ match, teamA, teamB, isAdmin }) => {
           color: #fff;
           text-shadow: 0 0 10px rgba(255,255,255,0.3);
         }
-        .team-players {
-          font-size: 0.75rem;
-          color: #666;
+        .team-club {
+          font-size: 0.85rem;
+          color: #99aabb;
+          margin-top: 1px;
         }
         .divider {
           height: 1px;
@@ -182,6 +269,54 @@ const MatchCard = ({ match, teamA, teamB, isAdmin }) => {
           0% { opacity: 1; }
           50% { opacity: 0.5; }
           100% { opacity: 1; }
+        }
+        .tb-row {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          margin-top: 8px;
+          padding: 6px 10px;
+          background: rgba(85, 153, 255, 0.1);
+          border: 1px solid rgba(85, 153, 255, 0.25);
+          border-radius: 8px;
+          font-size: 0.82rem;
+        }
+        .tb-label {
+          color: #6699cc;
+          font-weight: 700;
+          font-size: 0.78rem;
+          letter-spacing: 0.05em;
+          flex-shrink: 0;
+        }
+        .tb-scores {
+          font-size: 0.95rem;
+          font-weight: 700;
+        }
+        .tb-winner {
+          color: var(--tennis-yellow);
+          font-weight: 700;
+          font-size: 0.8rem;
+          margin-left: auto;
+        }
+        .tb-live {
+          background: rgba(85, 153, 255, 0.15);
+          border-color: rgba(85, 153, 255, 0.4);
+          animation: pulse-tb 1.5s infinite;
+        }
+        @keyframes pulse-tb {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.6; }
+        }
+        .team-rank-box {
+          font-size: 0.72rem;
+          color: #111;
+          background-color: #f2f2f2;
+          padding: 3px 6px;
+          border-radius: 4px;
+          font-weight: 800;
+          white-space: nowrap;
+          box-shadow: 0 1px 3px rgba(0,0,0,0.5);
+          letter-spacing: -0.2px;
         }
       `}</style>
     </div>

@@ -4,9 +4,7 @@
  */
 
 // Generate groups from a list of teams
-// Generate groups from a list of teams
 export const generateGroups = (teams, numGroups = 8) => {
-    // initialize empty groups
     const groups = Array.from({ length: numGroups }, (_, i) => ({
         id: i + 1,
         name: `${i + 1}조`,
@@ -14,27 +12,32 @@ export const generateGroups = (teams, numGroups = 8) => {
     }));
 
     // Distribute teams
+    // Priority 1: initial_group
+    // Priority 2: Fill groups evenly (Snake Draft style logic is mostly done in AdminDashboard, 
+    // but here we just ensure balanced filling if not provided)
     teams.forEach((team, index) => {
-        let groupIndex;
+        let targetGroupIndex = -1;
 
-        // If team has a pre-assigned group (1-based index or name)
         if (team.initial_group) {
-            // Try to match '1', '1조', 'A' (mapped to 1?)
-            // Assuming input is number for now
             const gId = parseInt(team.initial_group);
             if (!isNaN(gId) && gId >= 1 && gId <= numGroups) {
-                groupIndex = gId - 1;
-            } else {
-                // Fallback or handle error? For now, Round Robin
-                groupIndex = index % numGroups;
+                targetGroupIndex = gId - 1;
             }
-        } else {
-            // Round Robin
-            groupIndex = index % numGroups;
         }
 
-        if (groups[groupIndex]) {
-            groups[groupIndex].team_ids.push(team.id);
+        if (targetGroupIndex === -1) {
+            // Find the group with the least members
+            let minCount = Infinity;
+            groups.forEach((g, idx) => {
+                if (g.team_ids.length < minCount) {
+                    minCount = g.team_ids.length;
+                    targetGroupIndex = idx;
+                }
+            });
+        }
+
+        if (groups[targetGroupIndex]) {
+            groups[targetGroupIndex].team_ids.push(team.id);
         }
     });
 
@@ -43,36 +46,87 @@ export const generateGroups = (teams, numGroups = 8) => {
 
 // Generate Matches (Round Robin within groups)
 export const generateSchedule = (groups) => {
-    const matches = [];
+    let allMatches = [];
+    let globalMatchId = 1;
 
     groups.forEach(group => {
         const teamIds = group.team_ids;
         const n = teamIds.length;
         if (n < 2) return;
 
-        let matchIdx = 1;
-        for (let i = 0; i < n; i++) {
-            for (let j = i + 1; j < n; j++) {
-                const matchId = `g${group.id}_m${matchIdx}`;
+        let matchesForGroup = [];
 
-                matches.push({
-                    id: matchId,
+        if (n === 4) {
+            const schedule4 = [
+                { i: 0, j: 1, r: 1 }, // 1v2 (Match 1)
+                { i: 2, j: 3, r: 1 }, // 3v4 (Match 2)
+                { i: 0, j: 2, r: 2 }, // 1v3 (Match 3)
+                { i: 1, j: 3, r: 2 }, // 2v4 (Match 4)
+                { i: 0, j: 3, r: 3 }, // 1v4 (Match 5)
+                { i: 1, j: 2, r: 3 }  // 2v3 (Match 6)
+            ];
+
+            schedule4.forEach((match, idx) => {
+                matchesForGroup.push({
+                    id: `g${group.id}_m${idx + 1}`,
                     group_id: group.id,
-                    round: matchIdx, // Priority
-                    team_a_id: teamIds[i],
-                    team_b_id: teamIds[j],
+                    match_in_group: idx + 1, // e.g., 1st match of the group, 2nd match...
+                    team_a_id: teamIds[match.i],
+                    team_b_id: teamIds[match.j],
                     score_a: 0,
                     score_b: 0,
-                    status: "PENDING", // PENDING, LIVE, COMPLETED
+                    status: "PENDING",
                     court_id: null,
                     winner_id: null
                 });
-                matchIdx++;
+            });
+        } else {
+            // General Round Robin permutation for non-4 groups
+            let matchIdx = 1;
+            for (let i = 0; i < n; i++) {
+                for (let j = i + 1; j < n; j++) {
+                    matchesForGroup.push({
+                        id: `g${group.id}_m${matchIdx}`,
+                        group_id: group.id,
+                        match_in_group: matchIdx,
+                        team_a_id: teamIds[i],
+                        team_b_id: teamIds[j],
+                        score_a: 0,
+                        score_b: 0,
+                        status: "PENDING",
+                        court_id: null,
+                        winner_id: null
+                    });
+                    matchIdx++;
+                }
             }
         }
+        allMatches.push(matchesForGroup);
     });
 
-    return matches;
+    // Interleave matches across all groups
+    // e.g. Group 1 Match 1, Group 2 Match 1 ... Group N Match 1, Group 1 Match 2 ...
+    let interleavedMatches = [];
+    const maxMatches = Math.max(...allMatches.map(g => g.length)); // Max number of matches any group has
+
+    for (let mIdx = 0; mIdx < maxMatches; mIdx++) {
+        for (let gIdx = 0; gIdx < allMatches.length; gIdx++) {
+            if (allMatches[gIdx][mIdx]) {
+                interleavedMatches.push(allMatches[gIdx][mIdx]);
+            }
+        }
+    }
+
+    // Finalize match objects
+    interleavedMatches = interleavedMatches.map((m, idx) => {
+        const { match_in_group, ...rest } = m;
+        return {
+            ...rest,
+            round: idx + 1 // Use 'round' as the absolute sequence number for the whole UI
+        };
+    });
+
+    return interleavedMatches;
 };
 
 // Assign Matches to Courts
@@ -89,8 +143,18 @@ export const assignMatchesToCourts = (matches, courts) => {
         busyTeams.add(m.team_b_id);
     });
 
-    // 2. Identify Empty Courts
-    const emptyCourts = nextCourts.filter(c => c.match_id === null);
+    // 2. Identify Empty Courts & Auto-heal stuck courts
+    const emptyCourts = nextCourts.filter(c => {
+        if (c.match_id === null) return true;
+        // If court points to a match that is NOT LIVE (e.g., COMPLETED or PENDING due to regeneration), it's effectively empty (auto-heal)
+        const linkedMatch = nextMatches.find(m => m.id === c.match_id);
+        if (!linkedMatch || linkedMatch.status !== 'LIVE') {
+            c.match_id = null; // Auto-heal the court inside nextCourts
+            return true;
+        }
+        return false;
+    });
+
     if (emptyCourts.length === 0) return { matches: nextMatches, courts: nextCourts };
 
     // 3. Get Pending Matches
@@ -98,13 +162,10 @@ export const assignMatchesToCourts = (matches, courts) => {
     // Or Round (asc) to finish early rounds first.
     let pendingMatches = nextMatches.filter(m => m.status === 'PENDING' && !m.court_id);
 
-    // Simplistic sorting: Prioritize lower round numbers (finish round 1 before round 2)
-    pendingMatches.sort((a, b) => {
-        if (a.round === b.round) {
-            return a.group_id - b.group_id;
-        }
-        return a.round - b.round;
-    });
+    // Simplistic sorting: Prioritize by 'round' ascending.
+    // Since generateSchedule already perfectly interleaved the games and assigned sequential 'round' numbers,
+    // this ensures we assign all "Match 1s" across groups before moving to "Match 2s".
+    pendingMatches.sort((a, b) => a.round - b.round);
 
     // 4. Assign
     for (const court of emptyCourts) {
@@ -135,4 +196,439 @@ export const assignMatchesToCourts = (matches, courts) => {
     }
 
     return { matches: nextMatches, courts: nextCourts };
+};
+
+// Calculate Group Standings
+// Rules: 
+// 1. Wins (1 point per win)
+// 2. Goal Difference (score_a - score_b)
+// 3. Points For (total score earned)
+export const calculateStandings = (teams, matches) => {
+    // Initialize stats for each team
+    const stats = {};
+    teams.forEach(t => {
+        stats[t.id] = {
+            ...t,
+            played: 0,
+            wins: 0,
+            draws: 0,
+            losses: 0,
+            pts: 0,          // Win=2pts, Draw=1pt
+            gamesWon: 0,     // Total game/set points won across all matches
+            pointsFor: 0,
+            pointsAgainst: 0,
+            goalDiff: 0
+        };
+    });
+
+    // Aggregate match results
+    matches.forEach(m => {
+        // Is this a group stage match?
+        const isGroupStage = typeof m.group_id === 'number' || (typeof m.group_id === 'string' && m.group_id.includes("조"));
+
+        if (isGroupStage) {
+            if (stats[m.team_a_id]) stats[m.team_a_id].group_id = m.group_id;
+            if (stats[m.team_b_id]) stats[m.team_b_id].group_id = m.group_id;
+        }
+
+        if (m.status === 'COMPLETED') {
+            const teamA = stats[m.team_a_id];
+            const teamB = stats[m.team_b_id];
+
+            if (!teamA || !teamB) return;
+
+            teamA.played += 1;
+            teamB.played += 1;
+
+            const scoreA = m.score_a || 0;
+            const scoreB = m.score_b || 0;
+
+            teamA.pointsFor += scoreA;
+            teamA.pointsAgainst += scoreB;
+            teamB.pointsFor += scoreB;
+            teamB.pointsAgainst += scoreA;
+
+            // Track total games won (individual game/set points)
+            teamA.gamesWon += scoreA;
+            teamB.gamesWon += scoreB;
+
+            // Tennis scoring: 5:5 = draw (무승부), otherwise higher score wins
+            // Also fall back to winner_id if explicitly set
+            const isDraw = (scoreA === 5 && scoreB === 5);
+            if (isDraw) {
+                teamA.draws += 1;
+                teamB.draws += 1;
+            } else if (m.winner_id === teamA.id || (!isDraw && scoreA > scoreB)) {
+                teamA.wins += 1;
+                teamB.losses += 1;
+            } else if (m.winner_id === teamB.id || (!isDraw && scoreB > scoreA)) {
+                teamB.wins += 1;
+                teamA.losses += 1;
+            }
+
+            teamA.goalDiff = teamA.pointsFor - teamA.pointsAgainst;
+            teamB.goalDiff = teamB.pointsFor - teamB.pointsAgainst;
+
+            // Compute pts: win=3, draw=1 (User Request)
+            teamA.pts = teamA.wins * 3 + teamA.draws;
+            teamB.pts = teamB.wins * 3 + teamB.draws;
+        }
+    });
+
+    // Group teams and sort
+    const grouped = {};
+    Object.values(stats).forEach(team => {
+        const gName = team.group_id || team.group || team.initial_group || "Unknown";
+        if (!grouped[gName]) grouped[gName] = [];
+        grouped[gName].push(team);
+    });
+
+    Object.keys(grouped).forEach(gName => {
+        grouped[gName].sort((a, b) => {
+            if (b.pts !== a.pts) return b.pts - a.pts; // 1. 승점
+            if (b.wins !== a.wins) return b.wins - a.wins; // 2. 승수
+            if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff; // 3. 득실차
+
+            // 4. 나이 (합산 나이가 많을수록 우선)
+            const ageA = parseInt(a.age) || 0;
+            const ageB = parseInt(b.age) || 0;
+            if (ageB !== ageA) return ageB - ageA;
+
+            // 5. 추첨 순서 (drawOrder) - 추첨 시 배정된 순서대로
+            const doA = a.drawOrder ?? 9999;
+            const doB = b.drawOrder ?? 9999;
+            return doA - doB;
+        });
+
+        // Assign rank within group
+        grouped[gName].forEach((t, i) => t.groupRank = i + 1);
+    });
+
+    return grouped; // { "1조": [teamA, teamB..], "2조": [...] }
+};
+
+// Select Top 32 Teams (Top 2 from each group + top 8 3rd placers)
+export const getTop32Teams = (groupedStandings) => {
+    let directQualifiers = []; // Top 2 from each group
+    let thirdPlacers = [];     // 3rd place from each group
+
+    Object.values(groupedStandings).forEach(groupTeams => {
+        if (groupTeams.length > 0) {
+            directQualifiers.push({ ...groupTeams[0], groupRank: 1, originalGroup: groupTeams[0].group_id });
+        }
+        if (groupTeams.length > 1) {
+            directQualifiers.push({ ...groupTeams[1], groupRank: 2, originalGroup: groupTeams[1].group_id });
+        }
+        if (groupTeams.length > 2) {
+            thirdPlacers.push({ ...groupTeams[2], groupRank: 3, originalGroup: groupTeams[2].group_id });
+        }
+    });
+
+    // Sort 3rd placers to pick the best 'wildcards'
+    // Tiebreakers: 1. Points, 2. Wins, 3. GoalDiff, 4. Age
+    thirdPlacers.sort((a, b) => {
+        if (b.pts !== a.pts) return b.pts - a.pts;
+        if (b.wins !== a.wins) return b.wins - a.wins;
+        if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
+
+        const ageA = parseInt(a.age) || 0;
+        const ageB = parseInt(b.age) || 0;
+        if (ageB !== ageA) return ageB - ageA;
+
+        return a.name.localeCompare(b.name);
+    });
+
+    let top32 = [...directQualifiers];
+
+    // Take top 8 (or however many needed to reach 32)
+    const needed = 32 - top32.length;
+    if (needed > 0) {
+        top32 = [...top32, ...thirdPlacers.slice(0, needed)];
+    }
+
+    // Finally sort the 32 teams by overall performance to seed them 1 to 32
+    top32.sort((a, b) => {
+        if (b.wins !== a.wins) return b.wins - a.wins;
+        if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
+        return b.pointsFor - a.pointsFor;
+    });
+
+    // Ensure we ALWAYS return exactly 32 elements. Pad with BYE.
+    while (top32.length < 32) {
+        top32.push({
+            id: 'BYE',
+            name: 'BYE',
+            player1: 'BYE',
+            player2: '',
+            club: ''
+        });
+    }
+
+    return top32;
+};
+
+// Assign wildcards using backtracking to avoid same-group matchups
+const assignWildcards = (wildcardTeams, exactBracketSlots, allTeamsMap) => {
+    // exactBracketSlots: array of objects { index: matchIndex, opponent: teamObj }
+    const assignedSlots = new Array(8).fill(null);
+    const usedWildcards = new Set();
+
+    // Helper to get group number from a team
+    const getGroupNum = (team) => {
+        if (!team) return null;
+        let groupStr = team.initial_group || team.group_id || team.group || "";
+        return parseInt(String(groupStr).replace(/[^0-9]/g, ''), 10);
+    };
+
+    const backtrack = (slotIdx) => {
+        if (slotIdx === 8) return true; // All assigned successfully
+
+        const slot = exactBracketSlots[slotIdx];
+        const opponentGroup = getGroupNum(slot.opponent);
+
+        for (let i = 0; i < wildcardTeams.length; i++) {
+            if (usedWildcards.has(i)) continue;
+
+            const wTeam = wildcardTeams[i];
+            const wGroup = getGroupNum(wTeam);
+
+            // Constraint: Wildcard team cannot face a team from the same group
+            if (opponentGroup !== wGroup) {
+                // Try assigning
+                assignedSlots[slotIdx] = wTeam;
+                usedWildcards.add(i);
+
+                if (backtrack(slotIdx + 1)) return true; // Found a valid full assignment
+
+                // Undo
+                assignedSlots[slotIdx] = null;
+                usedWildcards.delete(i);
+            }
+        }
+        return false;
+    };
+
+    // If backtracking fails, just assign them sequentially and cross your fingers (fallback)
+    if (!backtrack(0)) {
+        console.warn("Could not find a perfect wildcard assignment without group overlap. Falling back to sequential.");
+        return wildcardTeams; // Just return them in order
+    }
+
+    return assignedSlots;
+};
+
+// Generate 32-team Knockout Bracket (Fixed Mapping)
+export const generateBracket32 = (top32Teams, groupedStandings) => {
+    // 1. Separate Top 32 into 1sts, 2nds, and Wildcards (3rds)
+    // We can rely on groupRank from top32Teams
+    const map1st = {}; // { 1: team, 2: team ... }
+    const map2nd = {};
+    const wildcards = [];
+
+    // Safe parsing of numbers from "1조"
+    const getGroupNum = (team) => {
+        let groupStr = team.initial_group || team.group_id || team.group || "";
+        return parseInt(String(groupStr).replace(/[^0-9]/g, ''), 10);
+    };
+
+    top32Teams.forEach(t => {
+        if (t.id === 'BYE') return;
+        const gNum = getGroupNum(t);
+        if (t.groupRank === 1) map1st[gNum] = t;
+        else if (t.groupRank === 2) map2nd[gNum] = t;
+        else if (t.groupRank === 3) wildcards.push(t);
+    });
+
+    // 2. Define the exact fixed bracket mapping (1-16)
+    // "W" implies a wildcard slot (3위)
+    const fixedLayout = [
+        { a: { rank: 1, g: 1 }, b: { rank: 2, g: 5 } },   // M1
+        { a: { rank: 1, g: 2 }, b: { rank: 3, g: 'W' } }, // M2
+        { a: { rank: 1, g: 3 }, b: { rank: 2, g: 7 } },   // M3
+        { a: { rank: 1, g: 4 }, b: { rank: 3, g: 'W' } }, // M4
+        { a: { rank: 1, g: 5 }, b: { rank: 3, g: 'W' } }, // M5
+        { a: { rank: 1, g: 6 }, b: { rank: 2, g: 10 } },  // M6
+        { a: { rank: 1, g: 7 }, b: { rank: 3, g: 'W' } }, // M7
+        { a: { rank: 1, g: 8 }, b: { rank: 2, g: 12 } },  // M8
+        // -- Split (우측 화면)
+        { a: { rank: 1, g: 9 }, b: { rank: 3, g: 'W' } }, // M9
+        { a: { rank: 1, g: 10 }, b: { rank: 2, g: 6 } },   // M10
+        { a: { rank: 1, g: 11 }, b: { rank: 3, g: 'W' } }, // M11
+        { a: { rank: 1, g: 12 }, b: { rank: 2, g: 8 } },   // M12
+        { a: { rank: 2, g: 4 }, b: { rank: 2, g: 9 } },   // M13
+        { a: { rank: 2, g: 3 }, b: { rank: 3, g: 'W' } }, // M14
+        { a: { rank: 2, g: 2 }, b: { rank: 2, g: 11 } },  // M15
+        { a: { rank: 2, g: 1 }, b: { rank: 3, g: 'W' } }  // M16
+    ];
+
+    // Helper to fetch the actual team object
+    const getTeam = (slot) => {
+        if (slot.g === 'W') return null; // Resolved later
+        return slot.rank === 1 ? map1st[slot.g] : map2nd[slot.g];
+    };
+
+    // 3. Setup Wildcard assignment constraints
+    // Find all 'W' slots and mark their opponents
+    const wildcardSlots = []; // { indexInMatch, opponentTeam }
+    fixedLayout.forEach((matchDef, idx) => {
+        if (matchDef.a.g === 'W') wildcardSlots.push({ idx, opponent: getTeam(matchDef.b) });
+        if (matchDef.b.g === 'W') wildcardSlots.push({ idx, opponent: getTeam(matchDef.a) });
+    });
+
+    // Run backtracking to safely place wildcards
+    let assignedWildcards = [];
+    if (wildcards.length > 0) {
+        assignedWildcards = assignWildcards(wildcards, wildcardSlots, null);
+    }
+
+    // We map back to the wildcardSlots
+    const assignedWildcardMap = {}; // matchIdx -> Assigned Wildcard Team
+    wildcardSlots.forEach((slot, wIdx) => {
+        assignedWildcardMap[slot.idx] = assignedWildcards[wIdx] || { id: 'BYE', name: 'BYE', player1: 'BYE' };
+    });
+
+    // 4. Construct matches in order
+    const matches = [];
+    fixedLayout.forEach((matchDef, idx) => {
+        let teamA = matchDef.a.g === 'W' ? assignedWildcardMap[idx] : getTeam(matchDef.a);
+        let teamB = matchDef.b.g === 'W' ? assignedWildcardMap[idx] : getTeam(matchDef.b);
+
+        // Fallbacks for missing teams
+        teamA = teamA || { id: 'BYE', name: 'BYE', player1: 'BYE', player2: '', club: '' };
+        teamB = teamB || { id: 'BYE', name: 'BYE', player1: 'BYE', player2: '', club: '' };
+
+        matches.push({
+            id: `ko32_m${idx + 1}`,
+            group_id: "본선 32강",
+            round: 10 + idx, // arbitrary ordering
+            team_a_id: teamA.id,
+            team_b_id: teamB.id,
+            score_a: 0,
+            score_b: 0,
+            status: "PENDING",
+            court_id: null,
+            winner_id: null,
+            next_match_id: `ko16_m${Math.floor(idx / 2) + 1}`,
+            is_team_a_next: idx % 2 === 0
+        });
+    });
+
+    // 5. Pre-generate matches for 16, 8, 4, Final
+    const generateEmptyRound = (prevCount, prefix, name, baseRound, nextPrefix) => {
+        const roundMatches = [];
+        const count = prevCount / 2;
+        for (let i = 0; i < count; i++) {
+            let nextMatchId = null;
+            let isTeamANext = false;
+            if (nextPrefix) {
+                nextMatchId = `${nextPrefix}_m${Math.floor(i / 2) + 1}`;
+                isTeamANext = i % 2 === 0;
+            }
+            roundMatches.push({
+                id: `${prefix}_m${i + 1}`,
+                group_id: name,
+                round: baseRound + i,
+                team_a_id: "TBD",
+                team_b_id: "TBD",
+                score_a: 0,
+                score_b: 0,
+                status: "PENDING",
+                court_id: null,
+                winner_id: null,
+                next_match_id: nextMatchId,
+                is_team_a_next: isTeamANext
+            });
+        }
+        return roundMatches;
+    };
+
+    const matches16 = generateEmptyRound(16, "ko16", "16강", 30, "ko8");
+    const matches8 = generateEmptyRound(8, "ko8", "8강", 40, "ko4");
+    const matches4 = generateEmptyRound(4, "ko4", "4강", 50, "final");
+    const matchesFinal = generateEmptyRound(2, "final", "결승", 60, null);
+
+    return [...matches, ...matches16, ...matches8, ...matches4, ...matchesFinal];
+};
+
+// Auto-advance winners in the knockout stage
+export const updateTournamentProgression = (matches, completedMatchId, winnerId) => {
+    // Deep copy to avoid mutating state directly
+    const newMatches = JSON.parse(JSON.stringify(matches));
+
+    const completedMatch = newMatches.find(m => m.id === completedMatchId);
+    if (!completedMatch || !completedMatch.next_match_id || !winnerId) {
+        return newMatches; // No advancement needed/possible
+    }
+
+    const nextMatch = newMatches.find(m => m.id === completedMatch.next_match_id);
+    if (nextMatch) {
+        if (completedMatch.is_team_a_next) {
+            nextMatch.team_a_id = winnerId;
+        } else {
+            nextMatch.team_b_id = winnerId;
+        }
+    }
+
+    return newMatches;
+};
+
+// Generate 16-team Random Bracket
+// For standard 16 teams remaining, totally random draw
+export const generateBracket16Random = (teams) => {
+    // Shuffle teams
+    const shuffled = [...teams].sort(() => Math.random() - 0.5);
+    const matches = [];
+    const numMatches = 8; // Round of 16 has 8 matches
+
+    for (let i = 0; i < numMatches; i++) {
+        const teamA = shuffled[i * 2];
+        const teamB = shuffled[i * 2 + 1];
+
+        matches.push({
+            id: `ko16_m${i + 1}`,
+            group_id: "본선 16강 (무작위)",
+            round: 30 + i, // Arbitrary round number to sort them after 32-gang
+            team_a_id: teamA ? teamA.id : "BYE",
+            team_b_id: teamB ? teamB.id : "BYE",
+            score_a: 0,
+            score_b: 0,
+            status: "PENDING",
+            court_id: null,
+            winner_id: null
+        });
+    }
+
+    return matches;
+};
+
+// Generate Next Knockout Round (16강, 8강, 4강, 결승)
+// Pairs winners of prevMatches ordered sequentially
+export const generateNextRound = (prevMatches, nextGroupName, nextMatchPrefix, nextRoundIndex) => {
+    const matches = [];
+    // Number of matches in next round is half of previous round
+    const numMatches = Math.floor(prevMatches.length / 2);
+
+    for (let i = 0; i < numMatches; i++) {
+        const m1 = prevMatches[i * 2];
+        const m2 = prevMatches[i * 2 + 1];
+
+        // If previous match is completed, we have a winner. Otherwise TBD.
+        const teamA = m1?.winner_id || "TBD";
+        const teamB = m2?.winner_id || "TBD";
+
+        matches.push({
+            id: `${nextMatchPrefix}_m${i + 1}`,
+            group_id: nextGroupName,
+            round: nextRoundIndex,
+            team_a_id: teamA,
+            team_b_id: teamB,
+            score_a: 0,
+            score_b: 0,
+            status: "PENDING",
+            court_id: null,
+            winner_id: null
+        });
+    }
+
+    return matches;
 };

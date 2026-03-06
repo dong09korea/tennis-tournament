@@ -6,11 +6,17 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
       <header className="app-header">
         <div className="header-content">
           <span style={{ fontSize: '28px' }}>🏆</span>
-          <h1>WIMBLEDON LIVE</h1>
+          <h1>2026년 라켓업 혼복 대회</h1>
         </div>
       </header>
 
       <nav className="tab-nav">
+        <button
+          className={`tab-btn ${activeTab === 'live' ? 'active' : ''}`}
+          onClick={() => onTabChange('live')}
+        >
+          실시간 코트
+        </button>
         <button
           className={`tab-btn ${activeTab === 'match' ? 'active' : ''}`}
           onClick={() => onTabChange('match')}
@@ -104,6 +110,20 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
           }
           .header-content h1 {
             font-size: 1.5rem;
+          }
+        }
+
+        /* Print Styles */
+        @media print {
+          .app-header, .tab-nav {
+            display: none !important;
+          }
+          .layout-container {
+            background: white !important;
+          }
+          .app-main {
+            padding: 0 !important;
+            margin: 0 !important;
           }
         }
       `}</style>
