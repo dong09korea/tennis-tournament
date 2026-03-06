@@ -278,7 +278,16 @@ export const calculateStandings = (teams, matches) => {
     // Group teams and sort
     const grouped = {};
     Object.values(stats).forEach(team => {
-        const gName = team.group_id || team.group || team.initial_group || "Unknown";
+        let rawGName = team.group_id || team.group || team.initial_group || "Unknown";
+        // Normalize: if it's a number like 1, or string "1", make it "1조" to prevent split duplicates
+        let gName = rawGName;
+        if (rawGName !== "Unknown") {
+            const numMatch = String(rawGName).match(/\d+/);
+            if (numMatch) {
+                gName = `${numMatch[0]}조`;
+            }
+        }
+
         if (!grouped[gName]) grouped[gName] = [];
         grouped[gName].push(team);
     });

@@ -58,6 +58,17 @@ const getWildcardIds = (allSortedGroups, tiebreakAges) => {
 };
 
 const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTiebreaker }) => {
+  // Helper to generate consistent colors based on club string
+  const getClubColor = (clubName) => {
+    if (!clubName) return '#888';
+    let hash = 0;
+    for (let i = 0; i < clubName.length; i++) {
+      hash = clubName.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const hue = Math.abs(hash) % 360;
+    return `hsl(${hue}, 70%, 75%)`;
+  };
+
   const rawStandingsData = useMemo(() => {
     if (!teams || !matches || teams.length === 0) return {};
     return calculateStandings(teams, matches);
@@ -207,7 +218,7 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                       <div className="sc-team">
                         <div className="sc-name">{p1}</div>
                         {p2 && <div className="sc-name2">{p2}</div>}
-                        {team.club && <div className="sc-club">{team.club}</div>}
+                        {team.club && <div className="sc-club" style={{ color: getClubColor(team.club) }}>{team.club}</div>}
                         {/* Admin tiebreaker age input — shown only when tied after all games played */}
                         {isAdmin && isTied && allPlayed && (() => {
                           const ageEntered = tiebreakAges[team.id] !== undefined;
@@ -323,7 +334,7 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                 <div className="sc-team">
                   <div className="sc-name">{p1}</div>
                   {p2 && <div className="sc-name2">{p2}</div>}
-                  {team.club && <div className="sc-club">{team.club}</div>}
+                  {team.club && <div className="sc-club" style={{ color: getClubColor(team.club) }}>{team.club}</div>}
                 </div>
                 <div className="sc-stat">{played}</div>
                 <div className="sc-stat col-pts" style={{ color: '#d5ff00', fontWeight: 700 }}>{pts}</div>
@@ -516,10 +527,14 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
           text-overflow: ellipsis;
         }
         .sc-club {
-          font-size: 0.7rem;
-          color: #666;
-          margin-top: 1px;
-          font-weight: 500;
+          font-size: 0.75rem;
+          margin-top: 3px;
+          font-weight: 600;
+          letter-spacing: -0.02em;
+          background: rgba(255, 255, 255, 0.05);
+          display: inline-block;
+          padding: 2px 6px;
+          border-radius: 4px;
         }
         .row-direct .sc-name  { color: #d5ff00; }
         .row-direct .sc-name2 { color: #b8d500; }
