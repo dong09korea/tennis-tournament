@@ -199,16 +199,28 @@ function App() {
             const bracketShellExists = newData.matches.some(m => m.group_id === '본선 32강');
 
             if (groupMatches.length > 0 && newData.teams) {
-                const allGroupsDoneForShell = groupMatches.length > 0 && groupMatches.every(m => m.status === 'COMPLETED');
-                // Step 1: Only create bracket shell AFTER all group matches are done
-                if (!bracketShellExists && !autoKnock32DoneRef.current && allGroupsDoneForShell) {
+                const anyGroupCompleted = (() => {
+                    // Check if at least one full group (all its matches) is completed
+                    const byGrp = {};
+                    groupMatches.forEach(m => {
+                        const key = m.group_id;
+                        if (!byGrp[key]) byGrp[key] = { total: 0, done: 0 };
+                        byGrp[key].total++;
+                        if (m.status === 'COMPLETED') byGrp[key].done++;
+                    });
+                    return Object.values(byGrp).some(g => g.total > 0 && g.done === g.total);
+                })();
+
+                // Step 1: Create bracket shell as soon as the first group finishes.
+                // TBD matches are safe thanks to the TBD guard in assignMatchesToCourts.
+                if (!bracketShellExists && !autoKnock32DoneRef.current && anyGroupCompleted) {
                     autoKnock32DoneRef.current = true;
                     setTimeout(async () => {
                         const fd = latestDataRef.current;
                         if (!fd || fd.matches.some(m => m.group_id === '본선 32강')) return;
                         const shell = initBracket32Shell();
                         await uploadData({ ...fd, matches: [...fd.matches, ...shell] });
-                        console.log('✅ 32강 브라켓 틀 생성 완료 (모든 예선 완료 후)');
+                        console.log('✅ 32강 브라켓 틀 생성 완료 (첫 번째 조 완료 시)');
                     }, 800);
                 }
 

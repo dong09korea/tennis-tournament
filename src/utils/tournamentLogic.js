@@ -158,9 +158,13 @@ export const assignMatchesToCourts = (matches, courts) => {
     if (emptyCourts.length === 0) return { matches: nextMatches, courts: nextCourts };
 
     // 3. Get Pending Matches
-    // Sort by Group ID (asc), then Round (asc) to distribute fairly?
-    // Or Round (asc) to finish early rounds first.
-    let pendingMatches = nextMatches.filter(m => m.status === 'PENDING' && !m.court_id);
+    // Skip matches where either team is TBD or BYE (bracket placeholder slots not yet filled)
+    let pendingMatches = nextMatches.filter(m =>
+        m.status === 'PENDING' &&
+        !m.court_id &&
+        m.team_a_id !== 'TBD' && m.team_a_id !== 'BYE' &&
+        m.team_b_id !== 'TBD' && m.team_b_id !== 'BYE'
+    );
 
     // Simplistic sorting: Prioritize by 'round' ascending.
     // Since generateSchedule already perfectly interleaved the games and assigned sequential 'round' numbers,
