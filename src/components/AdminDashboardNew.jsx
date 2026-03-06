@@ -377,9 +377,20 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
         setStatusMsg("예선전 결과를 무작위로 시뮬레이션 중...");
 
         try {
+            // Find the last match for each group
+            const groupLastMatches = {};
+            data.matches.forEach(m => {
+                const isGroupStage = typeof m.group_id === 'number' || (typeof m.group_id === 'string' && m.group_id.includes("조"));
+                if (isGroupStage) {
+                    groupLastMatches[m.group_id] = m.id;
+                }
+            });
+
             const nextMatches = data.matches.map(m => {
                 const isGroupStage = typeof m.group_id === 'number' || (typeof m.group_id === 'string' && m.group_id.includes("조"));
-                if (isGroupStage && m.status !== "COMPLETED") {
+                const isLastMatch = groupLastMatches[m.group_id] === m.id;
+
+                if (isGroupStage && !isLastMatch && m.status !== "COMPLETED") {
                     // Random win/loss avoiding ties
                     const scoreA = Math.floor(Math.random() * 7);
                     const scoreB = Math.floor(Math.random() * 7);
@@ -400,7 +411,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
             const nextCourts = data.courts.map(c => ({ ...c, match_id: null }));
 
             await uploadData({ ...data, matches: nextMatches, courts: nextCourts });
-            setStatusMsg("✅ 예선전 전경기 무작위 종료 완료!");
+            setStatusMsg("✅ 각 조 마지막 경기 제외 예선전 무작위 종료 완료!");
             setTimeout(() => setStatusMsg(""), 3000);
         } catch (e) {
             console.error(e);
@@ -1049,17 +1060,10 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                     </button>
                                     <button
                                         className="modern-button info"
-                                        onClick={fillMockData}
-                                        style={{ width: 'auto' }}
-                                    >
-                                        🧪 [검증용] 48팀 모의 데이터 채우기
-                                    </button>
-                                    <button
-                                        className="modern-button info"
                                         onClick={handleFastForwardGroups}
                                         style={{ width: 'auto' }}
                                     >
-                                        ⏩ [검증용] 예선전 전부 치트 승패 처리
+                                        ⏩ [검증용] 각 조 마지막 경기 제외 자동 승패 시뮬레이션
                                     </button>
                                 </div>
                             </div>
