@@ -1,6 +1,5 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { calculateStandings } from '../utils/tournamentLogic';
-import { uploadData } from '../services/firebase';
 
 // Sort teams within a group using standard rules + tiebreaker age
 const sortGroupTeams = (teams, tiebreakAges) => {
@@ -58,7 +57,7 @@ const getWildcardIds = (allSortedGroups, tiebreakAges) => {
   return new Set(thirdPlacers.slice(0, 8).map(t => t.id));
 };
 
-const Standings = ({ teams, groups, matches, isAdmin, onAdminAction }) => {
+const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTiebreaker }) => {
   const rawStandingsData = useMemo(() => {
     if (!teams || !matches || teams.length === 0) return {};
     return calculateStandings(teams, matches);
@@ -71,17 +70,15 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction }) => {
     setTiebreakAges(prev => ({ ...prev, [teamId]: val }));
   }, []);
 
-  // Save tiebreakAge to Firebase so calculateStandings + bracket fill can use it
+  // Save tiebreakAge via callback so App.jsx handles full data object
   const [confirming, setConfirming] = useState(false);
-  const confirmTiebreaker = useCallback(async (groupTeams, tiedIds, allTeams, allMatches, courts) => {
+  const confirmTiebreaker = useCallback(async (tiedIds, onConfirmTiebreaker) => {
     const allEntered = [...tiedIds].every(id => tiebreakAges[id] !== undefined);
     if (!allEntered) { alert('동점인 모든 팀의 나이를 입력해주세요.'); return; }
+    if (!onConfirmTiebreaker) { alert('저장 기능을 사용할 수 없습니다.'); return; }
     setConfirming(true);
     try {
-      const updatedTeams = allTeams.map(t =>
-        tiebreakAges[t.id] !== undefined ? { ...t, tiebreakAge: Number(tiebreakAges[t.id]) } : t
-      );
-      await uploadData({ teams: updatedTeams, matches: allMatches, courts });
+      await onConfirmTiebreaker(tiebreakAges);
     } catch (e) { alert('저장 오류: ' + e.message); }
     finally { setConfirming(false); }
   }, [tiebreakAges]);
@@ -262,7 +259,7 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction }) => {
                 {isAdmin && allPlayed && tiedIds.size > 0 && allTiedAgesEntered && !tieAlreadyConfirmed && (
                   <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(255,155,85,0.3)' }}>
                     <button
-                      onClick={() => confirmTiebreaker(groupTeams, tiedIds, teams, matches, [])}
+                      onClick={() => confirmTiebreaker(tiedIds, onConfirmTiebreaker)}
                       disabled={confirming}
                       style={{
                         width: '100%', padding: '8px', fontSize: '0.85rem', fontWeight: 700,

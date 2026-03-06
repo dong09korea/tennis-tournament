@@ -454,6 +454,14 @@ function App() {
                             }
                         }
                     }}
+                    onConfirmTiebreaker={async (tiebreakAges) => {
+                        const updatedTeams = data.teams.map(t =>
+                            tiebreakAges[t.id] !== undefined
+                                ? { ...t, tiebreakAge: Number(tiebreakAges[t.id]) }
+                                : t
+                        );
+                        await uploadData({ ...data, teams: updatedTeams });
+                    }}
                 />
             </div>
 
