@@ -256,19 +256,21 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                 })}
 
                 {/* Confirm tiebreaker button */}
-                {isAdmin && allPlayed && tiedIds.size > 0 && allTiedAgesEntered && !tieAlreadyConfirmed && (
+                {isAdmin && allPlayed && tiedIds.size > 0 && !tieAlreadyConfirmed && (
                   <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(255,155,85,0.3)' }}>
                     <button
                       onClick={() => confirmTiebreaker(tiedIds, onConfirmTiebreaker)}
-                      disabled={confirming}
+                      disabled={confirming || !allTiedAgesEntered}
                       style={{
-                        width: '100%', padding: '8px', fontSize: '0.85rem', fontWeight: 700,
-                        background: 'linear-gradient(135deg,#4caf50,#2e7d32)',
-                        color: '#fff', border: 'none', borderRadius: '6px',
-                        cursor: confirming ? 'wait' : 'pointer'
+                        width: '100%', padding: '10px', fontSize: '0.85rem', fontWeight: 700,
+                        background: allTiedAgesEntered ? 'linear-gradient(135deg,#4caf50,#2e7d32)' : '#555',
+                        color: allTiedAgesEntered ? '#fff' : '#aaa',
+                        border: 'none', borderRadius: '6px',
+                        cursor: confirming ? 'wait' : (!allTiedAgesEntered ? 'not-allowed' : 'pointer'),
+                        transition: 'all 0.2s'
                       }}
                     >
-                      {confirming ? '저장 중...' : '✅ 나이 순위 확정 (브라켓 자동 배치)'}
+                      {confirming ? '저장 중...' : (!allTiedAgesEntered ? '⚠️ 동점팀의 합산나이를 모두 입력해주세요' : '✅ 나이 순위 확정 (브라켓 자동 배치)')}
                     </button>
                   </div>
                 )}
