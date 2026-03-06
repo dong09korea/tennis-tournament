@@ -129,6 +129,64 @@ export const generateSchedule = (groups) => {
     return interleavedMatches;
 };
 
+/**
+ * Mathematically confirmed rankings for a group.
+ * Returns { 1: teamId, 2: teamId } for positions that are LOCKED IN
+ * regardless of remaining match results.
+ * Only 1위/2위 checked (wildcard/3위 handled separately after all groups done).
+ */
+export const getConfirmedRankings = (groupMatches) => {
+    const teamIds = [...new Set(groupMatches.flatMap(m => [m.team_a_id, m.team_b_id]))];
+    const pts = {};
+    const remaining = {};
+
+    teamIds.forEach(id => { pts[id] = 0; remaining[id] = 0; });
+
+    groupMatches.forEach(m => {
+        if (m.status === 'COMPLETED') {
+            const sa = m.score_a || 0, sb = m.score_b || 0;
+            const isDraw = sa === 5 && sb === 5;
+            if (isDraw) {
+                pts[m.team_a_id] = (pts[m.team_a_id] || 0) + 1;
+                pts[m.team_b_id] = (pts[m.team_b_id] || 0) + 1;
+            } else if (sa > sb) {
+                pts[m.team_a_id] = (pts[m.team_a_id] || 0) + 3;
+            } else {
+                pts[m.team_b_id] = (pts[m.team_b_id] || 0) + 3;
+            }
+        } else {
+            remaining[m.team_a_id] = (remaining[m.team_a_id] || 0) + 1;
+            remaining[m.team_b_id] = (remaining[m.team_b_id] || 0) + 1;
+        }
+    });
+
+    // maxPts[id] = best possible total points for this team
+    const maxPts = {};
+    teamIds.forEach(id => { maxPts[id] = (pts[id] || 0) + (remaining[id] || 0) * 3; });
+
+    // Sort by current pts desc to get tentative ranking
+    const sorted = [...teamIds].sort((a, b) => (pts[b] || 0) - (pts[a] || 0));
+
+    const confirmed = {};
+
+    // A team at position P is confirmed if fewer than P teams can mathematically SURPASS them.
+    // "Surpass" = their maxPts > this team's MINIMUM pts (current pts, assuming they lose everything).
+    sorted.forEach((tid, idx) => {
+        const myMinPts = pts[tid] || 0;
+        const canSurpass = teamIds.filter(other => other !== tid && (maxPts[other] || 0) > myMinPts);
+        const confirmedRank = canSurpass.length + 1; // They are at least (canSurpass.length + 1)th
+        // If confirmed rank ≤ 2, they're guaranteed top-2
+        if (confirmedRank <= 2) {
+            // Find what rank they are confirmed to be
+            // Their current rank in sorted order is idx+1. They're confirmed if nobody above them can be displaced.
+            if (!confirmed[1]) confirmed[1] = tid;
+            else if (!confirmed[2]) confirmed[2] = tid;
+        }
+    });
+
+    return confirmed; // e.g. { 1: 'team_abc', 2: 'team_xyz' }
+};
+
 // Assign Matches to Courts
 // Returns updated { matches, courts }
 export const assignMatchesToCourts = (matches, courts) => {

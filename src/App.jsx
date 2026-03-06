@@ -5,7 +5,7 @@ import Standings from './components/Standings';
 import AdminDashboard from './components/AdminDashboardNew';
 
 import { subscribeToData, uploadData } from './services/firebase';
-import { assignMatchesToCourts, calculateStandings, getTop32Teams, generateBracket32, initBracket32Shell, FIXED_BRACKET_LAYOUT } from './utils/tournamentLogic';
+import { assignMatchesToCourts, calculateStandings, getTop32Teams, generateBracket32, initBracket32Shell, FIXED_BRACKET_LAYOUT, getConfirmedRankings } from './utils/tournamentLogic';
 
 // Request notification permission on load
 const requestNotifPermission = async () => {
@@ -252,27 +252,33 @@ function App() {
                         let updatedMatches = JSON.parse(JSON.stringify(fd.matches));
                         const getGroupNum = (g) => parseInt(String(g).replace(/[^0-9]/g, ''), 10);
 
-                        // Build a set of group numbers where ALL matches are COMPLETED
-                        // Only these groups' rankings are final and safe to fill into 32강 slots
+                        // Build a set of group numbers where rankings are confirmed for 1위/2위.
+                        // Two cases are accepted:
+                        //  (A) All matches in the group are COMPLETED (full confirmation)
+                        //  (B) 1위 and 2위 are mathematically locked in even before all matches finish
                         const matchesByGroup = {};
                         fd.matches.filter(isGroupMatch).forEach(m => {
                             const key = getGroupNum(m.group_id);
                             if (!matchesByGroup[key]) matchesByGroup[key] = [];
                             matchesByGroup[key].push(m);
                         });
-                        const fullyCompletedGroupNums = new Set(
-                            Object.entries(matchesByGroup)
-                                .filter(([, gMatches]) => gMatches.length > 0 && gMatches.every(m => m.status === 'COMPLETED'))
-                                .map(([gNum]) => parseInt(gNum, 10))
-                        );
 
-                        // rankMap only includes groups whose rankings are FINAL
                         const rankMap = {};
-                        Object.entries(standings).forEach(([gName, teams]) => {
-                            const gNum = getGroupNum(gName);
-                            if (fullyCompletedGroupNums.has(gNum)) {
+                        Object.entries(matchesByGroup).forEach(([gNumStr, gMatches]) => {
+                            const gNum = parseInt(gNumStr, 10);
+                            const allDone = gMatches.every(m => m.status === 'COMPLETED');
+
+                            if (allDone) {
+                                // Full group done: use standings
+                                const gStandings = standings[`${gNum}조`] || standings[gNum] || [];
                                 rankMap[gNum] = {};
-                                teams.forEach((t, i) => { rankMap[gNum][i + 1] = t.id; });
+                                gStandings.forEach((t, i) => { rankMap[gNum][i + 1] = t.id; });
+                            } else {
+                                // Check mathematical clinching for 1위/2위
+                                const confirmedRanks = getConfirmedRankings(gMatches);
+                                if (confirmedRanks[1] || confirmedRanks[2]) {
+                                    rankMap[gNum] = { ...confirmedRanks };
+                                }
                             }
                         });
 
