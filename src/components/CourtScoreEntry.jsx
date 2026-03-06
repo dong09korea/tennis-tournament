@@ -27,6 +27,23 @@ const CourtScoreEntry = () => {
     // Clamp tiebreak score: max 10
     const clampTb = (val) => Math.max(0, Math.min(10, parseInt(val) || 0));
 
+    const handleScoreChange = (field, rawValue) => {
+        const isTb = field === 'tb_score_a' || field === 'tb_score_b';
+        const strVal = rawValue === '' ? '' : String(isTb ? clampTb(rawValue) : clampMain(rawValue));
+
+        // Update local state immediately
+        if (field === 'score_a') setScoreA(strVal);
+        else if (field === 'score_b') setScoreB(strVal);
+        else if (field === 'tb_score_a') setTbScoreA(strVal);
+        else if (field === 'tb_score_b') setTbScoreB(strVal);
+
+        // Auto-sync to Firebase in the background
+        if (currentMatch?.id) {
+            const numVal = strVal === '' ? 0 : parseInt(strVal, 10);
+            updateMatch(currentMatch.id, { [field]: numVal }).catch(e => console.error("Real-time sync failed", e));
+        }
+    };
+
     useEffect(() => {
         const unsubscribe = subscribeToData((fetchedData) => {
             setData(fetchedData);
@@ -71,6 +88,15 @@ const CourtScoreEntry = () => {
 
     const teamA = data?.teams?.find(t => t.id === currentMatch.team_a_id);
     const teamB = data?.teams?.find(t => t.id === currentMatch.team_b_id);
+
+    // Initialize state from Firebase data if currently empty
+    useEffect(() => {
+        if (!currentMatch) return;
+        if (scoreA === '' && currentMatch.score_a != null) setScoreA(String(currentMatch.score_a));
+        if (scoreB === '' && currentMatch.score_b != null) setScoreB(String(currentMatch.score_b));
+        if (tbScoreA === '' && currentMatch.tb_score_a != null) setTbScoreA(String(currentMatch.tb_score_a));
+        if (tbScoreB === '' && currentMatch.tb_score_b != null) setTbScoreB(String(currentMatch.tb_score_b));
+    }, [currentMatch, scoreA, scoreB, tbScoreA, tbScoreB]);
 
     const isGroupStage = isGroupStageMatch(currentMatch);
     const numA = parseInt(scoreA) || 0;
@@ -238,7 +264,7 @@ const CourtScoreEntry = () => {
                                 className="score-input modern-input"
                                 placeholder="0"
                                 value={scoreA}
-                                onChange={(e) => setScoreA(String(clampMain(e.target.value)))}
+                                onChange={(e) => handleScoreChange('score_a', e.target.value)}
                                 min="0" max="6" required
                             />
                         </div>
@@ -251,7 +277,7 @@ const CourtScoreEntry = () => {
                                 className="score-input modern-input"
                                 placeholder="0"
                                 value={scoreB}
-                                onChange={(e) => setScoreB(String(clampMain(e.target.value)))}
+                                onChange={(e) => handleScoreChange('score_b', e.target.value)}
                                 min="0" max="6" required
                             />
                         </div>
@@ -279,7 +305,7 @@ const CourtScoreEntry = () => {
                                         className="score-input score-input-tb modern-input"
                                         placeholder="0"
                                         value={tbScoreA}
-                                        onChange={(e) => setTbScoreA(String(clampTb(e.target.value)))}
+                                        onChange={(e) => handleScoreChange('tb_score_a', e.target.value)}
                                         min="0" max="10"
                                     />
                                 </div>
@@ -291,7 +317,7 @@ const CourtScoreEntry = () => {
                                         className="score-input score-input-tb modern-input"
                                         placeholder="0"
                                         value={tbScoreB}
-                                        onChange={(e) => setTbScoreB(String(clampTb(e.target.value)))}
+                                        onChange={(e) => handleScoreChange('tb_score_b', e.target.value)}
                                         min="0" max="10"
                                     />
                                 </div>
