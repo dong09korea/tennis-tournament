@@ -522,6 +522,38 @@ const CourtScoreEntry = () => {
                 .error-card h2 { color: #ff4444; }
                 .success-card h2 { color: var(--tennis-yellow); }
                 .sub-text { font-size: 0.9rem; color: #888; margin-top: 10px; }
+
+                /* Mobile Optimizations */
+                @media (max-width: 500px) {
+                    .mobile-container {
+                        padding: 5px;
+                        min-height: calc(100vh - 2rem);
+                    }
+                    .glass-panel {
+                        padding: 1.5rem 1rem;
+                        border-radius: 15px;
+                    }
+                    .score-input {
+                        width: 70px;
+                        height: 70px;
+                        font-size: 2rem !important;
+                    }
+                    .score-input-tb {
+                        width: 60px !important;
+                        height: 60px !important;
+                        font-size: 1.5rem !important;
+                    }
+                    .team-name {
+                        font-size: 1rem;
+                    }
+                    .card-header h2 {
+                        font-size: 1.2rem;
+                        margin-bottom: 5px;
+                    }
+                    .teams-grid {
+                        gap: 8px;
+                    }
+                }
             `}</style>
         </div>
     );
