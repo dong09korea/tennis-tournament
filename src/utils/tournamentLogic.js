@@ -289,9 +289,9 @@ export const calculateStandings = (teams, matches) => {
             if (b.wins !== a.wins) return b.wins - a.wins; // 2. 승수
             if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff; // 3. 득실차
 
-            // 4. 나이 (합산 나이가 많을수록 우선)
-            const ageA = parseInt(a.age) || 0;
-            const ageB = parseInt(b.age) || 0;
+            // 4. 나이 타이브레이커 (관리자가 동점 시 순위표에서 입력 후 확정)
+            const ageA = parseInt(a.tiebreakAge) || 0;
+            const ageB = parseInt(b.tiebreakAge) || 0;
             if (ageB !== ageA) return ageB - ageA;
 
             // 5. 추첨 순서 (drawOrder) - 추첨 시 배정된 순서대로

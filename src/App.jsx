@@ -127,6 +127,40 @@ function App() {
             }
         }
 
+        // ── Tie detection: alert admin when a group finishes with tied teams ──
+        if (isAdmin && newData.matches && newData.teams) {
+            const isGroupMatchFn = (m) => {
+                const g = m.group_id;
+                return typeof g === 'number' || (typeof g === 'string' && g.includes('조')) || /^\d+$/.test(String(g));
+            };
+            const byGroup = {};
+            newData.matches.filter(isGroupMatchFn).forEach(m => {
+                if (!byGroup[m.group_id]) byGroup[m.group_id] = [];
+                byGroup[m.group_id].push(m);
+            });
+            Object.entries(byGroup).forEach(([gName, gMatches]) => {
+                const allDone = gMatches.every(m => m.status === 'COMPLETED');
+                if (!allDone) return;
+                const prevGMatches = (prevMatchesRef.current || []).filter(m => m.group_id === gName);
+                const wasDone = prevGMatches.length > 0 && prevGMatches.every(m => m.status === 'COMPLETED');
+                if (wasDone) return;
+                const standings = calculateStandings(newData.teams, newData.matches);
+                const gs = standings[gName] || [];
+                const hasTie = gs.some((t, i) => gs.some((u, j) =>
+                    i !== j && t.pts === u.pts && t.wins === u.wins && t.goalDiff === u.goalDiff && !t.tiebreakAge && !u.tiebreakAge
+                ));
+                if (hasTie) {
+                    const notifId = `tie_${gName}`;
+                    setNotifications(prev => prev.some(n => n.id === notifId) ? prev : [
+                        ...prev, {
+                            id: notifId, type: 'tie', group: gName,
+                            teamA: '🔥 동점 발생!', teamB: '순위표에서 합산 나이를 입력·확정해주세요', court: '→ 순위표 탭'
+                        }
+                    ]);
+                }
+            });
+        }
+
         // Auto-assignment check
         if (newData.matches && newData.courts) {
             const hasEmptyCourts = newData.courts.some(c => {

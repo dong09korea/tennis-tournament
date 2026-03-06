@@ -1,5 +1,6 @@
 import React, { useMemo, useState, useCallback } from 'react';
 import { calculateStandings } from '../utils/tournamentLogic';
+import { uploadData } from '../services/firebase';
 
 // Sort teams within a group using standard rules + tiebreaker age
 const sortGroupTeams = (teams, tiebreakAges) => {
@@ -69,6 +70,22 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction }) => {
   const handleAgeChange = useCallback((teamId, val) => {
     setTiebreakAges(prev => ({ ...prev, [teamId]: val }));
   }, []);
+
+  // Save tiebreakAge to Firebase so calculateStandings + bracket fill can use it
+  const [confirming, setConfirming] = useState(false);
+  const confirmTiebreaker = useCallback(async (groupTeams, tiedIds, allTeams, allMatches, courts) => {
+    const allEntered = [...tiedIds].every(id => tiebreakAges[id] !== undefined);
+    if (!allEntered) { alert('동점인 모든 팀의 나이를 입력해주세요.'); return; }
+    setConfirming(true);
+    try {
+      const updatedTeams = allTeams.map(t =>
+        tiebreakAges[t.id] !== undefined ? { ...t, tiebreakAge: Number(tiebreakAges[t.id]) } : t
+      );
+      await uploadData({ teams: updatedTeams, matches: allMatches, courts });
+    } catch (e) { alert('저장 오류: ' + e.message); }
+    finally { setConfirming(false); }
+  }, [tiebreakAges]);
+
 
   // Re-sort each group using tiebreakAges
   const standingsData = useMemo(() => {
@@ -145,6 +162,12 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction }) => {
             const groupTeams = standingsData[groupName] || [];
             const tiedIds = getTiedTeamIds(groupTeams);
             const allPlayed = groupTeams.every(t => t.played > 0);
+            const allTiedAgesEntered = tiedIds.size > 0 && [...tiedIds].every(id => tiebreakAges[id] !== undefined);
+            // Check if tiebreak is already confirmed (saved to Firebase)
+            const tieAlreadyConfirmed = tiedIds.size > 0 && [...tiedIds].every(id => {
+              const t = groupTeams.find(t => t.id === id);
+              return t?.tiebreakAge !== undefined;
+            });
 
             return (
               <div key={groupName} className="standings-card">
@@ -234,6 +257,29 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction }) => {
                     </div>
                   );
                 })}
+
+                {/* Confirm tiebreaker button */}
+                {isAdmin && allPlayed && tiedIds.size > 0 && allTiedAgesEntered && !tieAlreadyConfirmed && (
+                  <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(255,155,85,0.3)' }}>
+                    <button
+                      onClick={() => confirmTiebreaker(groupTeams, tiedIds, teams, matches, [])}
+                      disabled={confirming}
+                      style={{
+                        width: '100%', padding: '8px', fontSize: '0.85rem', fontWeight: 700,
+                        background: 'linear-gradient(135deg,#4caf50,#2e7d32)',
+                        color: '#fff', border: 'none', borderRadius: '6px',
+                        cursor: confirming ? 'wait' : 'pointer'
+                      }}
+                    >
+                      {confirming ? '저장 중...' : '✅ 나이 순위 확정 (브라켓 자동 배치)'}
+                    </button>
+                  </div>
+                )}
+                {isAdmin && allPlayed && tieAlreadyConfirmed && (
+                  <div style={{ padding: '6px 12px', fontSize: '0.72rem', color: '#4caf50', textAlign: 'center' }}>
+                    ✅ 나이 순위 확정 완료 — 브라켓 슬롯이 자동 업데이트됩니다
+                  </div>
+                )}
               </div>
             );
           })}
