@@ -1,6 +1,6 @@
 import React from 'react';
 import { updateMatch, updateCourt, uploadData } from '../services/firebase';
-import { updateTournamentProgression } from '../utils/tournamentLogic';
+import { updateTournamentProgression, FIXED_BRACKET_LAYOUT } from '../utils/tournamentLogic';
 
 const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
   const isCompleted = match.status === 'COMPLETED';
@@ -15,8 +15,21 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
 
   const winnerId = match.winner_id;
 
-  const getRankLabel = (team) => {
+  const getRankLabel = (team, isTeamA) => {
     if (!team || team.id === 'BYE' || team.id === 'TBD') return null;
+
+    if (match.id && match.id.startsWith('ko32_m')) {
+      const matchNumMatch = match.id.match(/^ko32_m(\d+)$/);
+      if (matchNumMatch) {
+        const mIdx = parseInt(matchNumMatch[1], 10) - 1;
+        if (FIXED_BRACKET_LAYOUT[mIdx]) {
+          const def = isTeamA ? FIXED_BRACKET_LAYOUT[mIdx].a : FIXED_BRACKET_LAYOUT[mIdx].b;
+          if (def.g === 'W') return '와일드카드';
+          return `${def.g}조 ${def.rank}위`;
+        }
+      }
+    }
+
     if (team.groupRank && team.initial_group) {
       return `${String(team.initial_group).replace(/조/g, '')}조 ${team.groupRank}위`;
     }
@@ -114,8 +127,8 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
 
       <div className="team-row">
         <div className="team-side" style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-          {isKnockout && getRankLabel(teamA) && (
-            <div className="team-rank-box">{getRankLabel(teamA)}</div>
+          {isKnockout && getRankLabel(teamA, true) && (
+            <div className="team-rank-box">{getRankLabel(teamA, true)}</div>
           )}
           <div className="team-info">
             <span className={`team-name ${winnerId === teamA.id ? 'winner' : ''}`}>
@@ -141,8 +154,8 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
 
       <div className="team-row">
         <div className="team-side" style={{ display: 'flex', alignItems: 'center', gap: '8px', overflow: 'hidden' }}>
-          {isKnockout && getRankLabel(teamB) && (
-            <div className="team-rank-box">{getRankLabel(teamB)}</div>
+          {isKnockout && getRankLabel(teamB, false) && (
+            <div className="team-rank-box">{getRankLabel(teamB, false)}</div>
           )}
           <div className="team-info">
             <span className={`team-name ${winnerId === teamB.id ? 'winner' : ''}`}>
