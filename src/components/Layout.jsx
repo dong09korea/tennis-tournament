@@ -95,21 +95,25 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
         @media (max-width: 768px) {
           .app-header {
             flex-direction: column;
-            gap: 1rem;
-            padding: 1rem;
+            gap: 0.5rem;
+            padding: 1rem 0.5rem;
           }
           .tab-nav {
             width: 100%;
+            gap: 0.5rem;
           }
           .tab-btn {
             flex: 1;
             text-align: center;
+            padding: 0.6rem 0.2rem;
+            font-size: 0.9rem;
+            white-space: nowrap;
           }
           .app-main {
-            padding: 1rem;
+            padding: 1rem 0.5rem;
           }
           .header-content h1 {
-            font-size: 1.5rem;
+            font-size: 1.4rem;
           }
         }
 

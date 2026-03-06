@@ -288,6 +288,41 @@ const BracketFixed = ({ matches, teams, courts, isAdmin, numCourts, activeTab })
             text-align: center;
         }
         
+        @media (max-width: 480px) {
+            .court-grid-section {
+                padding: 1rem;
+            }
+            .section-title {
+                font-size: 1.1rem;
+                justify-content: center;
+                margin-bottom: 1rem;
+            }
+            .court-card {
+                padding: 0.8rem 0.5rem;
+            }
+            .court-header {
+                font-size: 0.75rem;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 4px;
+            }
+            .court-team {
+                font-size: 0.8rem;
+                flex-direction: column;
+                gap: 5px;
+            }
+            .team-name {
+                font-size: 0.85rem;
+                text-align: center;
+                line-height: 1.2;
+            }
+            .team-score {
+                font-size: 1rem;
+                padding: 2px 12px;
+            }
+        }
+        
         .vs-divider {
             text-align: center;
             font-size: 0.7rem;
