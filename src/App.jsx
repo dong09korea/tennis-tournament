@@ -251,11 +251,29 @@ function App() {
                         // Fill slots progressively
                         let updatedMatches = JSON.parse(JSON.stringify(fd.matches));
                         const getGroupNum = (g) => parseInt(String(g).replace(/[^0-9]/g, ''), 10);
+
+                        // Build a set of group numbers where ALL matches are COMPLETED
+                        // Only these groups' rankings are final and safe to fill into 32강 slots
+                        const matchesByGroup = {};
+                        fd.matches.filter(isGroupMatch).forEach(m => {
+                            const key = getGroupNum(m.group_id);
+                            if (!matchesByGroup[key]) matchesByGroup[key] = [];
+                            matchesByGroup[key].push(m);
+                        });
+                        const fullyCompletedGroupNums = new Set(
+                            Object.entries(matchesByGroup)
+                                .filter(([, gMatches]) => gMatches.length > 0 && gMatches.every(m => m.status === 'COMPLETED'))
+                                .map(([gNum]) => parseInt(gNum, 10))
+                        );
+
+                        // rankMap only includes groups whose rankings are FINAL
                         const rankMap = {};
                         Object.entries(standings).forEach(([gName, teams]) => {
                             const gNum = getGroupNum(gName);
-                            rankMap[gNum] = {};
-                            teams.forEach((t, i) => { rankMap[gNum][i + 1] = t.id; });
+                            if (fullyCompletedGroupNums.has(gNum)) {
+                                rankMap[gNum] = {};
+                                teams.forEach((t, i) => { rankMap[gNum][i + 1] = t.id; });
+                            }
                         });
 
                         let changed = false;

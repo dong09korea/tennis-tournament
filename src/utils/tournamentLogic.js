@@ -158,7 +158,10 @@ export const assignMatchesToCourts = (matches, courts) => {
     if (emptyCourts.length === 0) return { matches: nextMatches, courts: nextCourts };
 
     // 3. Get Pending Matches
-    // Skip matches where either team is TBD or BYE (bracket placeholder slots not yet filled)
+    // Skip matches where either team is TBD or BYE.
+    // A 32강 match enters the queue only when BOTH teams are confirmed.
+    // Wildcard slots in 32강 stay TBD until all groups finish (handled in App.jsx),
+    // so those naturally stay out of court assignment until the right moment.
     let pendingMatches = nextMatches.filter(m =>
         m.status === 'PENDING' &&
         !m.court_id &&
@@ -166,25 +169,8 @@ export const assignMatchesToCourts = (matches, courts) => {
         m.team_b_id !== 'TBD' && m.team_b_id !== 'BYE'
     );
 
-    // GROUP STAGE PRIORITY: If ANY group match is still Pending or Live,
-    // knockout matches must NOT take a court yet.
-    const isGroupMatch = (m) => {
-        const g = m.group_id;
-        return typeof g === 'number' ||
-            (typeof g === 'string' && /^\d+조$/.test(g)) ||
-            /^\d+$/.test(String(g));
-    };
-    const groupStageActive = nextMatches.some(m =>
-        isGroupMatch(m) && (m.status === 'PENDING' || m.status === 'LIVE')
-    );
-    if (groupStageActive) {
-        // Only allow group-stage matches into courts while group stage is running
-        pendingMatches = pendingMatches.filter(isGroupMatch);
-    }
-
-    // Simplistic sorting: Prioritize by 'round' ascending.
+    // Sort by round ascending so earlier matches get priority
     pendingMatches.sort((a, b) => a.round - b.round);
-
 
     // 4. Assign
     for (const court of emptyCourts) {
