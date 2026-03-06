@@ -38,6 +38,7 @@ function App() {
     const latestDataRef = useRef({ teams: [], groups: [], matches: [], courts: [] });
     const adminRef = useRef(null);
     const autoKnock32DoneRef = useRef(false); // prevent repeated auto-generation
+    const [audioUnlocked, setAudioUnlocked] = useState(false);
 
     // For Lottery Animation preview in Standings
     const [previewTeams, setPreviewTeams] = useState(null);
@@ -349,16 +350,7 @@ function App() {
     };
 
     const handleUpload = async () => {
-        if (confirm("현재 데이터를 Firebase에 업로드하시겠습니까? (기존 데이터 덮어쓰기)")) {
-            setStatus("업로드 중...");
-            try {
-                await uploadData(initialData);
-                setStatus("업로드 완료! (성공)");
-                setTimeout(() => setStatus(""), 3000);
-            } catch (e) {
-                setStatus("업로드 실패: " + e.message);
-            }
-        }
+        alert('업로드 기능이 비활성화되었습니다. (initialData 제거됨)');
     };
 
     return (
@@ -393,6 +385,51 @@ function App() {
 
             {/* Operator Mode - Always visible */}
             {/* Operator Mode - Moved to AdminDashboard */}
+            {/* 🔔 알람 활성화 버튼: mobile browsers block audio without user interaction */}
+            {!audioUnlocked && !isAdmin && (
+                <div style={{
+                    position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
+                    zIndex: 9999, textAlign: 'center'
+                }}>
+                    <button
+                        onClick={() => {
+                            try {
+                                if (!alarmAudioRef.current) {
+                                    alarmAudioRef.current = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+                                    alarmAudioRef.current.loop = true;
+                                }
+                                alarmAudioRef.current.volume = 0.01;
+                                alarmAudioRef.current.play().then(() => {
+                                    alarmAudioRef.current.pause();
+                                    alarmAudioRef.current.currentTime = 0;
+                                    alarmAudioRef.current.volume = 1.0;
+                                    setAudioUnlocked(true);
+                                }).catch(() => setAudioUnlocked(true));
+                            } catch (e) { setAudioUnlocked(true); }
+                            // Also request browser push notification permission
+                            if ('Notification' in window && Notification.permission === 'default') {
+                                Notification.requestPermission();
+                            }
+                        }}
+                        style={{
+                            padding: '12px 24px',
+                            background: 'linear-gradient(135deg, #ff9800, #e65100)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '50px',
+                            fontSize: '1rem',
+                            fontWeight: 700,
+                            cursor: 'pointer',
+                            boxShadow: '0 4px 15px rgba(255,152,0,0.5)',
+                            animation: 'pulse 2s infinite'
+                        }}
+                    >
+                        🔔 경기 알람 켜기
+                    </button>
+                    <div style={{ color: '#aaa', fontSize: '0.75rem', marginTop: '6px' }}>눌러야 경기 배정 알림을 받을 수 있어요</div>
+                </div>
+            )}
+
             {activeTab !== 'admin' && (
                 <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999 }}>
                     <button
