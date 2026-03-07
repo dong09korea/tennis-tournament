@@ -3,6 +3,7 @@ import Layout from './components/Layout';
 import Bracket from './components/BracketFixed';
 import Standings from './components/Standings';
 import AdminDashboard from './components/AdminDashboardNew';
+import SplashScreen from './components/SplashScreen';
 
 import { subscribeToData, uploadData } from './services/firebase';
 import { assignMatchesToCourts, calculateStandings, getTop32Teams, generateBracket32, initBracket32Shell, FIXED_BRACKET_LAYOUT, getConfirmedRankings } from './utils/tournamentLogic';
@@ -39,6 +40,8 @@ function App() {
     const adminRef = useRef(null);
     const autoKnock32DoneRef = useRef(false); // prevent repeated auto-generation
     const [audioUnlocked, setAudioUnlocked] = useState(false);
+    // Splash: show once per browser session
+    const [showSplash, setShowSplash] = useState(() => !sessionStorage.getItem('splashDone'));
 
     // For Lottery Animation preview in Standings
     const [previewTeams, setPreviewTeams] = useState(null);
@@ -412,154 +415,161 @@ function App() {
     };
 
     return (
-        <Layout
-            activeTab={activeTab}
-            onTabChange={setActiveTab}
-            isAdmin={isAdmin}
-            onToggleAdmin={() => {
-                if (isAdmin) {
-                    setIsAdmin(false);
-                    setActiveTab('match');
-                } else {
-                    setActiveTab('admin');
-                }
-            }}
-        >
-            {/* Global Notification Overlay - Supports Multiple Stacked Notifications */}
-            {notifications.length > 0 && (
-                <div className="global-notification">
-                    <div className="notification-stack">
-                        {notifications.map((notif, idx) => (
-                            <div key={notif.id} className="notification-content pulse-animation">
-                                <h2>📢 다음 경기 배정 알림 {notifications.length > 1 ? `(${idx + 1}/${notifications.length})` : ''}</h2>
-                                <p className="notification-teams">[{notif.group}] {notif.teamA} VS {notif.teamB}</p>
-                                <p className="notification-court">👉 <span>{notif.court}번 코트</span>로 출전 바랍니다!</p>
-                                <button onClick={() => dismissNotification(notif.id)} className="modern-button primary full-width mt-10">확인 (알람 종료)</button>
-                            </div>
-                        ))}
+        <>
+            {showSplash && (
+                <SplashScreen onEnter={() => {
+                    sessionStorage.setItem('splashDone', '1');
+                    setShowSplash(false);
+                }} />
+            )}
+            <Layout
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+                isAdmin={isAdmin}
+                onToggleAdmin={() => {
+                    if (isAdmin) {
+                        setIsAdmin(false);
+                        setActiveTab('match');
+                    } else {
+                        setActiveTab('admin');
+                    }
+                }}
+            >
+                {/* Global Notification Overlay - Supports Multiple Stacked Notifications */}
+                {notifications.length > 0 && (
+                    <div className="global-notification">
+                        <div className="notification-stack">
+                            {notifications.map((notif, idx) => (
+                                <div key={notif.id} className="notification-content pulse-animation">
+                                    <h2>📢 다음 경기 배정 알림 {notifications.length > 1 ? `(${idx + 1}/${notifications.length})` : ''}</h2>
+                                    <p className="notification-teams">[{notif.group}] {notif.teamA} VS {notif.teamB}</p>
+                                    <p className="notification-court">👉 <span>{notif.court}번 코트</span>로 출전 바랍니다!</p>
+                                    <button onClick={() => dismissNotification(notif.id)} className="modern-button primary full-width mt-10">확인 (알람 종료)</button>
+                                </div>
+                            ))}
+                        </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Operator Mode - Always visible */}
-            {/* Operator Mode - Moved to AdminDashboard */}
-            {/* 🔔 알람 활성화 버튼: mobile browsers block audio without user interaction */}
-            {!audioUnlocked && !isAdmin && (
-                <div style={{
-                    position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
-                    zIndex: 9999, textAlign: 'center'
-                }}>
-                    <button
-                        onClick={() => {
-                            try {
-                                if (!alarmAudioRef.current) {
-                                    alarmAudioRef.current = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
-                                    alarmAudioRef.current.loop = true;
-                                }
-                                alarmAudioRef.current.volume = 0.01;
-                                alarmAudioRef.current.play().then(() => {
-                                    alarmAudioRef.current.pause();
-                                    alarmAudioRef.current.currentTime = 0;
-                                    alarmAudioRef.current.volume = 1.0;
-                                    setAudioUnlocked(true);
-                                }).catch(() => setAudioUnlocked(true));
-                            } catch (e) { setAudioUnlocked(true); }
-                            // Also request browser push notification permission
-                            if ('Notification' in window && Notification.permission === 'default') {
-                                Notification.requestPermission();
-                            }
-                        }}
-                        style={{
-                            padding: '12px 24px',
-                            background: 'linear-gradient(135deg, #ff9800, #e65100)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '50px',
-                            fontSize: '1rem',
-                            fontWeight: 700,
-                            cursor: 'pointer',
-                            boxShadow: '0 4px 15px rgba(255,152,0,0.5)',
-                            animation: 'pulse 2s infinite'
-                        }}
-                    >
-                        🔔 경기 알람 켜기
-                    </button>
-                    <div style={{ color: '#aaa', fontSize: '0.75rem', marginTop: '6px' }}>눌러야 경기 배정 알림을 받을 수 있어요</div>
-                </div>
-            )}
-
-            {activeTab !== 'admin' && (
-                <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999 }}>
-                    <button
-                        onClick={() => setActiveTab('admin')}
-                        style={{
-                            padding: '10px 15px',
-                            background: '#444',
-                            color: 'white',
-                            border: '1px solid #666',
-                            borderRadius: '8px',
-                            cursor: 'pointer',
-                            opacity: 0.9,
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.3)'
-                        }}
-                    >
-                        🔐 운영자 로그인
-                    </button>
-                    {/* DB Reset Removed - Access inside Admin Dashboard */}
-                </div>
-            )}
-
-            <div style={{ display: activeTab === 'admin' ? 'block' : 'none' }}>
-                <AdminDashboard
-                    ref={adminRef}
-                    data={data}
-                    isAdmin={isAdmin}
-                    onLogin={(val) => setIsAdmin(val)}
-                    numCourts={numCourts}
-                    setNumCourts={setNumCourts}
-                />
-            </div>
-
-            <div style={{ display: (activeTab === 'match' || activeTab === 'live') ? 'block' : 'none' }}>
-                <Bracket matches={data.matches} teams={data.teams} courts={data.courts} isAdmin={false} numCourts={numCourts} activeTab={activeTab} />
-            </div>
-
-            <div style={{ display: activeTab === 'standings' ? 'block' : 'none' }}>
-                <Standings
-                    teams={previewTeams || data.teams}
-                    groups={previewGroups || data.groups}
-                    matches={data.matches} // matches remain same during preview
-                    isAdmin={isAdmin}
-                    onAdminAction={(action) => {
-                        if (action === 'lottery') {
-                            if (adminRef.current && adminRef.current.triggerLotteryAnimation) {
-                                adminRef.current.triggerLotteryAnimation(
-                                    (teams, groups) => {
-                                        setPreviewTeams(teams);
-                                        setPreviewGroups(groups);
-                                    },
-                                    () => {
-                                        setPreviewTeams(null);
-                                        setPreviewGroups(null);
+                {/* Operator Mode - Always visible */}
+                {/* Operator Mode - Moved to AdminDashboard */}
+                {/* 🔔 알람 활성화 버튼: mobile browsers block audio without user interaction */}
+                {!audioUnlocked && !isAdmin && (
+                    <div style={{
+                        position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
+                        zIndex: 9999, textAlign: 'center'
+                    }}>
+                        <button
+                            onClick={() => {
+                                try {
+                                    if (!alarmAudioRef.current) {
+                                        alarmAudioRef.current = new Audio('https://actions.google.com/sounds/v1/alarms/beep_short.ogg');
+                                        alarmAudioRef.current.loop = true;
                                     }
-                                );
-                            } else {
-                                alert("관리자 대시보드 탭에 한번 접속해야 활성화됩니다.");
-                            }
-                        }
-                    }}
-                    onConfirmTiebreaker={async (tiebreakAges) => {
-                        const updatedTeams = data.teams.map(t =>
-                            tiebreakAges[t.id] !== undefined
-                                ? { ...t, tiebreakAge: Number(tiebreakAges[t.id]) }
-                                : t
-                        );
-                        await uploadData({ ...data, teams: updatedTeams });
-                    }}
-                />
-            </div>
+                                    alarmAudioRef.current.volume = 0.01;
+                                    alarmAudioRef.current.play().then(() => {
+                                        alarmAudioRef.current.pause();
+                                        alarmAudioRef.current.currentTime = 0;
+                                        alarmAudioRef.current.volume = 1.0;
+                                        setAudioUnlocked(true);
+                                    }).catch(() => setAudioUnlocked(true));
+                                } catch (e) { setAudioUnlocked(true); }
+                                // Also request browser push notification permission
+                                if ('Notification' in window && Notification.permission === 'default') {
+                                    Notification.requestPermission();
+                                }
+                            }}
+                            style={{
+                                padding: '12px 24px',
+                                background: 'linear-gradient(135deg, #ff9800, #e65100)',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '50px',
+                                fontSize: '1rem',
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 15px rgba(255,152,0,0.5)',
+                                animation: 'pulse 2s infinite'
+                            }}
+                        >
+                            🔔 경기 알람 켜기
+                        </button>
+                        <div style={{ color: '#aaa', fontSize: '0.75rem', marginTop: '6px' }}>눌러야 경기 배정 알림을 받을 수 있어요</div>
+                    </div>
+                )}
 
-            <style>{`
+                {activeTab !== 'admin' && (
+                    <div style={{ position: 'fixed', bottom: '20px', right: '20px', zIndex: 9999 }}>
+                        <button
+                            onClick={() => setActiveTab('admin')}
+                            style={{
+                                padding: '10px 15px',
+                                background: '#444',
+                                color: 'white',
+                                border: '1px solid #666',
+                                borderRadius: '8px',
+                                cursor: 'pointer',
+                                opacity: 0.9,
+                                boxShadow: '0 2px 5px rgba(0,0,0,0.3)'
+                            }}
+                        >
+                            🔐 운영자 로그인
+                        </button>
+                        {/* DB Reset Removed - Access inside Admin Dashboard */}
+                    </div>
+                )}
+
+                <div style={{ display: activeTab === 'admin' ? 'block' : 'none' }}>
+                    <AdminDashboard
+                        ref={adminRef}
+                        data={data}
+                        isAdmin={isAdmin}
+                        onLogin={(val) => setIsAdmin(val)}
+                        numCourts={numCourts}
+                        setNumCourts={setNumCourts}
+                    />
+                </div>
+
+                <div style={{ display: (activeTab === 'match' || activeTab === 'live') ? 'block' : 'none' }}>
+                    <Bracket matches={data.matches} teams={data.teams} courts={data.courts} isAdmin={false} numCourts={numCourts} activeTab={activeTab} />
+                </div>
+
+                <div style={{ display: activeTab === 'standings' ? 'block' : 'none' }}>
+                    <Standings
+                        teams={previewTeams || data.teams}
+                        groups={previewGroups || data.groups}
+                        matches={data.matches} // matches remain same during preview
+                        isAdmin={isAdmin}
+                        onAdminAction={(action) => {
+                            if (action === 'lottery') {
+                                if (adminRef.current && adminRef.current.triggerLotteryAnimation) {
+                                    adminRef.current.triggerLotteryAnimation(
+                                        (teams, groups) => {
+                                            setPreviewTeams(teams);
+                                            setPreviewGroups(groups);
+                                        },
+                                        () => {
+                                            setPreviewTeams(null);
+                                            setPreviewGroups(null);
+                                        }
+                                    );
+                                } else {
+                                    alert("관리자 대시보드 탭에 한번 접속해야 활성화됩니다.");
+                                }
+                            }
+                        }}
+                        onConfirmTiebreaker={async (tiebreakAges) => {
+                            const updatedTeams = data.teams.map(t =>
+                                tiebreakAges[t.id] !== undefined
+                                    ? { ...t, tiebreakAge: Number(tiebreakAges[t.id]) }
+                                    : t
+                            );
+                            await uploadData({ ...data, teams: updatedTeams });
+                        }}
+                    />
+                </div>
+
+                <style>{`
                 .global-notification {
                     position: fixed;
                     top: 0; left: 0; right: 0; bottom: 0;
@@ -622,7 +632,8 @@ function App() {
                     to { opacity: 1; }
                 }
             `}</style>
-        </Layout>
+            </Layout>
+        </>
     );
 }
 
