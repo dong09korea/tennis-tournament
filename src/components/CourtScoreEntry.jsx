@@ -24,8 +24,8 @@ const CourtScoreEntry = () => {
 
     // Clamp main score: group=max6, knockout=max6 (tiebreak handled separately)
     const clampMain = (val) => Math.max(0, Math.min(6, parseInt(val) || 0));
-    // Clamp tiebreak score: max 10
-    const clampTb = (val) => Math.max(0, Math.min(10, parseInt(val) || 0));
+    // Clamp tiebreak score: max 7
+    const clampTb = (val) => Math.max(0, Math.min(7, parseInt(val) || 0));
 
     const handleScoreChange = (field, rawValue) => {
         const isTb = field === 'tb_score_a' || field === 'tb_score_b';
