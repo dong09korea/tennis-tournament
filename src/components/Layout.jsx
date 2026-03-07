@@ -4,9 +4,26 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
   return (
     <div className="layout-container">
       <header className="app-header">
-        <div className="header-content">
-          <span style={{ fontSize: '28px' }}>🏆</span>
-          <h1>2026년 라켓업 혼복 대회</h1>
+        <div className="header-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <span style={{ fontSize: '28px' }}>🏆</span>
+            <h1>2026년 라켓업 혼복 대회</h1>
+          </div>
+          <a href="tel:0932797810" style={{ flexShrink: 0 }}>
+            <img
+              src="/ad.png"
+              alt="DAIN 3D 프린팅"
+              style={{
+                height: '52px',
+                width: 'auto',
+                borderRadius: '8px',
+                objectFit: 'cover',
+                objectPosition: 'center top',
+                display: 'block',
+                cursor: 'pointer'
+              }}
+            />
+          </a>
         </div>
       </header>
 
