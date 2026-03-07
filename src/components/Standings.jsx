@@ -169,7 +169,13 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
           {groupNames.map(groupName => {
             const groupTeams = standingsData[groupName] || [];
             const tiedIds = getTiedTeamIds(groupTeams);
-            const allPlayed = groupTeams.every(t => t.played > 0);
+            // ALL matches in this group must be COMPLETED before showing the tie UI
+            const groupMatches = (matches || []).filter(m => {
+              const g = String(m.group_id);
+              const gn = String(groupName);
+              return g === gn || g === gn.replace(/조$/, '') || g.replace(/조$/, '') === gn.replace(/조$/, '');
+            });
+            const allGroupMatchesDone = groupMatches.length > 0 && groupMatches.every(m => m.status === 'COMPLETED');
             const allTiedAgesEntered = tiedIds.size > 0 && [...tiedIds].every(id => tiebreakAges[id] !== undefined);
             // Check if tiebreak is already confirmed (saved to Firebase)
             const tieAlreadyConfirmed = tiedIds.size > 0 && [...tiedIds].every(id => {
@@ -204,7 +210,7 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                   const goalDiff = team.goalDiff || 0;
 
                   const isDirect = index < 2 && played > 0;
-                  const isWild = wildcardIds.has(team.id) && allPlayed;
+                  const isWild = wildcardIds.has(team.id) && allGroupMatchesDone;
                   const rowMod = isDirect ? 'row-direct' : isWild ? 'row-wild' : '';
                   const isTied = tiedIds.has(team.id);
 
@@ -219,8 +225,8 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                         <div className="sc-name">{p1}</div>
                         {p2 && <div className="sc-name2">{p2}</div>}
                         {team.club && <div className="sc-club" style={{ color: getClubColor(team.club) }}>{team.club}</div>}
-                        {/* Admin tiebreaker age input — shown only when tied after all games played */}
-                        {isAdmin && isTied && allPlayed && (() => {
+                        {/* Admin tiebreaker age input — shown only when ALL group matches are completed AND there is a tie */}
+                        {isAdmin && isTied && allGroupMatchesDone && (() => {
                           const ageEntered = tiebreakAges[team.id] !== undefined;
                           return (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '5px' }}>
