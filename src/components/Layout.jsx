@@ -35,9 +35,9 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
         {children}
       </main>
 
-      {/* ── Sticky Bottom Ad Banner ── */}
-      <div className="bottom-ad-banner">
-        <img src="/ad.png" alt="DAIN 3D 프린팅" className="bottom-ad-img" />
+      {/* ── Full-Width Ad Section at bottom of page ── */}
+      <div className="bottom-ad-section">
+        <img src="/ad.png" alt="DAIN 3D 프린팅" className="bottom-ad-full-img" />
       </div>
 
       <style>{`
@@ -92,31 +92,23 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
         }
         .app-main {
           padding: 2rem;
-          padding-bottom: calc(2rem + 72px); /* extra for banner */
           max-width: 1400px;
           margin: 0 auto;
         }
 
-        /* ── Bottom Ad Banner ── */
-        .bottom-ad-banner {
-          position: fixed;
-          bottom: 0;
-          left: 0;
-          right: 0;
-          z-index: 200;
-          background: #195fc6; /* match the blue of the ad */
+        /* ── Bottom Ad Section (in-page, full width) ── */
+        .bottom-ad-section {
+          width: 100%;
+          background: #fff;
+          border-top: 3px solid #1a73e8;
           display: flex;
           justify-content: center;
-          align-items: center;
-          height: 64px;
-          overflow: hidden;
-          box-shadow: 0 -3px 12px rgba(0,0,0,0.35);
         }
-        .bottom-ad-img {
-          height: 100%;
+        .bottom-ad-full-img {
           width: 100%;
-          object-fit: contain;
-          object-position: center;
+          max-width: 100vw;
+          height: auto;
+          display: block;
         }
 
         /* Mobile Styles */
@@ -139,19 +131,15 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
           }
           .app-main {
             padding: 1rem 0.5rem;
-            padding-bottom: calc(1rem + 64px);
           }
           .header-content h1 {
             font-size: 1.4rem;
-          }
-          .bottom-ad-banner {
-            height: 56px;
           }
         }
 
         /* Print Styles */
         @media print {
-          .app-header, .tab-nav, .bottom-ad-banner {
+          .app-header, .tab-nav, .bottom-ad-section {
             display: none !important;
           }
           .layout-container {
@@ -164,6 +152,7 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
         }
       `}</style>
     </div>
+
 
   );
 };
