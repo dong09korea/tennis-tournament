@@ -135,56 +135,68 @@ export const generateSchedule = (groups) => {
  * regardless of remaining match results.
  * Only 1위/2위 checked (wildcard/3위 handled separately after all groups done).
  */
-export const getConfirmedRankings = (groupMatches) => {
-    const teamIds = [...new Set(groupMatches.flatMap(m => [m.team_a_id, m.team_b_id]))];
-    const pts = {};
-    const remaining = {};
+export const getConfirmedRankings = (groupMatches, groupTeams) => {
+    if (!groupMatches || groupMatches.length === 0) return {};
 
-    teamIds.forEach(id => { pts[id] = 0; remaining[id] = 0; });
+    const incomplete = groupMatches.filter(m => m.status !== 'COMPLETED');
 
-    groupMatches.forEach(m => {
-        if (m.status === 'COMPLETED') {
-            const sa = m.score_a || 0, sb = m.score_b || 0;
-            const isDraw = sa === 5 && sb === 5;
-            if (isDraw) {
-                pts[m.team_a_id] = (pts[m.team_a_id] || 0) + 1;
-                pts[m.team_b_id] = (pts[m.team_b_id] || 0) + 1;
-            } else if (sa > sb) {
-                pts[m.team_a_id] = (pts[m.team_a_id] || 0) + 3;
-            } else {
-                pts[m.team_b_id] = (pts[m.team_b_id] || 0) + 3;
-            }
-        } else {
-            remaining[m.team_a_id] = (remaining[m.team_a_id] || 0) + 1;
-            remaining[m.team_b_id] = (remaining[m.team_b_id] || 0) + 1;
+    // If more than 4 matches remain, it's too many simulations (3^5 = 243, 3^6 = 729...)
+    // Keep it conservative: 4 matches = 81 sims.
+    if (incomplete.length > 4) return {};
+
+    // Outcome possibilities for each remaining match.
+    // We use extreme GD (6-0) and Draw (5-5) to test the boundaries.
+    const outcomes = [
+        { sa: 6, sb: 0 }, // Team A blowout win
+        { sa: 5, sb: 5 }, // Draw
+        { sa: 0, sb: 6 }  // Team B blowout win
+    ];
+
+    const simulations = [];
+    const completed = groupMatches.filter(m => m.status === 'COMPLETED');
+
+    const generate = (idx, currentSim) => {
+        if (idx === incomplete.length) {
+            simulations.push(currentSim);
+            return;
         }
-    });
+        for (const out of outcomes) {
+            const simulatedMatch = {
+                ...incomplete[idx],
+                status: 'COMPLETED',
+                score_a: out.sa,
+                score_b: out.sb,
+                winner_id: out.sa === out.sb ? null : (out.sa > out.sb ? incomplete[idx].team_a_id : incomplete[idx].team_b_id)
+            };
+            generate(idx + 1, [...currentSim, simulatedMatch]);
+        }
+    };
 
-    // maxPts[id] = best possible total points for this team
-    const maxPts = {};
-    teamIds.forEach(id => { maxPts[id] = (pts[id] || 0) + (remaining[id] || 0) * 3; });
+    generate(0, completed);
 
-    // Sort by current pts desc to get tentative ranking
-    const sorted = [...teamIds].sort((a, b) => (pts[b] || 0) - (pts[a] || 0));
+    // Track which team occupies which rank across ALL simulations
+    const rankMatrix = {}; // { teamId: { rank: count } }
 
+    for (const simMatches of simulations) {
+        const gStandingsMap = calculateStandings(groupTeams, simMatches);
+        const gName = Object.keys(gStandingsMap)[0];
+        const sorted = gStandingsMap[gName] || [];
+
+        sorted.forEach((team, idx) => {
+            const rank = idx + 1;
+            if (!rankMatrix[team.id]) rankMatrix[team.id] = {};
+            rankMatrix[team.id][rank] = (rankMatrix[team.id][rank] || 0) + 1;
+        });
+    }
+
+    const total = simulations.length;
     const confirmed = {};
+    for (const tid of Object.keys(rankMatrix)) {
+        if (rankMatrix[tid][1] === total) confirmed[1] = tid;
+        if (rankMatrix[tid][2] === total) confirmed[2] = tid;
+    }
 
-    // A team at position P is confirmed if fewer than P teams can mathematically SURPASS them.
-    // "Surpass" = their maxPts > this team's MINIMUM pts (current pts, assuming they lose everything).
-    sorted.forEach((tid, idx) => {
-        const myMinPts = pts[tid] || 0;
-        const canSurpass = teamIds.filter(other => other !== tid && (maxPts[other] || 0) > myMinPts);
-        const confirmedRank = canSurpass.length + 1; // They are at least (canSurpass.length + 1)th
-        // If confirmed rank ≤ 2, they're guaranteed top-2
-        if (confirmedRank <= 2) {
-            // Find what rank they are confirmed to be
-            // Their current rank in sorted order is idx+1. They're confirmed if nobody above them can be displaced.
-            if (!confirmed[1]) confirmed[1] = tid;
-            else if (!confirmed[2]) confirmed[2] = tid;
-        }
-    });
-
-    return confirmed; // e.g. { 1: 'team_abc', 2: 'team_xyz' }
+    return confirmed;
 };
 
 // Assign Matches to Courts

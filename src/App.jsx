@@ -298,7 +298,15 @@ function App() {
                                 rankMap[gNum] = {};
                                 gStandings.forEach((t, i) => { rankMap[gNum][i + 1] = t.id; });
                             } else {
-                                // Not all matches done → skip, wait for full completion
+                                // Not all matches done → Check mathematical clinching for 1위/2위
+                                // Use simulation logic: only fill if rank is locked across all outcomes
+                                const gTeamIds = [...new Set(gMatches.flatMap(m => [m.team_a_id, m.team_b_id]))];
+                                const gTeams = fd.teams.filter(t => gTeamIds.includes(t.id));
+
+                                const confirmedRanks = getConfirmedRankings(gMatches, gTeams);
+                                if (confirmedRanks[1] || confirmedRanks[2]) {
+                                    rankMap[gNum] = { ...confirmedRanks };
+                                }
                             }
                         });
 
