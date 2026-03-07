@@ -106,28 +106,15 @@ export const generateSchedule = (groups) => {
         allMatches.push(matchesForGroup);
     });
 
-    // 1. Group matches into Rounds (e.g. Round 1, Round 2...) within each group list
-    const groupedByRoundPerGroup = allMatches.map(groupMatches => {
-        const rounds = {};
-        groupMatches.forEach(m => {
-            const r = m.round_num || 1; // Assuming we add round_num to match object in generate logic
-            if (!rounds[r]) rounds[r] = [];
-            rounds[r].push(m);
-        });
-        return Object.values(rounds); // List of round-match-arrays
-    });
-
-    // 2. Interleave the Rounds across all groups
-    // e.g. G1(Round 1), G2(Round 1) ... G1(Round 2), G2(Round 2) ...
+    // Interleave matches across all groups
+    // e.g. Match 1 of all groups, then Match 2 of all groups...
     let interleavedMatches = [];
-    const maxRounds = Math.max(...groupedByRoundPerGroup.map(g => g.length));
+    const maxMatches = Math.max(...allMatches.map(g => g.length));
 
-    for (let rIdx = 0; rIdx < maxRounds; rIdx++) {
-        for (let gIdx = 0; gIdx < groupedByRoundPerGroup.length; gIdx++) {
-            const currentGroupRounds = groupedByRoundPerGroup[gIdx];
-            if (currentGroupRounds[rIdx]) {
-                // Add all matches for this group's specific round
-                interleavedMatches.push(...currentGroupRounds[rIdx]);
+    for (let mIdx = 0; mIdx < maxMatches; mIdx++) {
+        for (let gIdx = 0; gIdx < allMatches.length; gIdx++) {
+            if (allMatches[gIdx][mIdx]) {
+                interleavedMatches.push(allMatches[gIdx][mIdx]);
             }
         }
     }
