@@ -1058,13 +1058,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                     >
                                         🗑️ 초기화
                                     </button>
-                                    <button
-                                        className="modern-button info"
-                                        onClick={handleFastForwardGroups}
-                                        style={{ width: 'auto' }}
-                                    >
-                                        ⏩ [검증용] 각 조 마지막 경기 제외 자동 승패 시뮬레이션
-                                    </button>
+
                                 </div>
                             </div>
                         )}
@@ -1179,6 +1173,83 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                             <div className="tab-content fade-in">
                                 <div className="card-header">
                                     <h3><span className="icon-gap">🎾</span> 경기 결과 관리</h3>
+
+                                    {/* ── 시뮬레이션 패널 ── */}
+                                    {data?.courts?.some(c => c.match_id) && (
+                                        <div style={{
+                                            background: 'rgba(255,152,0,0.08)',
+                                            border: '1px solid rgba(255,152,0,0.3)',
+                                            borderRadius: '12px',
+                                            padding: '1rem',
+                                            marginBottom: '1.2rem'
+                                        }}>
+                                            <div style={{ color: '#ff9800', fontWeight: 700, marginBottom: '0.7rem', fontSize: '0.9rem' }}>
+                                                🧪 시뮬레이션 — 코트별 경기 종료
+                                            </div>
+                                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+                                                {data.courts
+                                                    .filter(c => {
+                                                        if (!c.match_id) return false;
+                                                        const m = data.matches.find(m => m.id === c.match_id);
+                                                        return m && m.status === 'LIVE';
+                                                    })
+                                                    .sort((a, b) => a.id - b.id)
+                                                    .map(court => {
+                                                        const match = data.matches.find(m => m.id === court.match_id);
+                                                        const teamA = data.teams.find(t => t.id === match.team_a_id);
+                                                        const teamB = data.teams.find(t => t.id === match.team_b_id);
+                                                        const label = `${court.id}코트: ${teamA?.name?.split('/')[0] || '?'} vs ${teamB?.name?.split('/')[0] || '?'}`;
+                                                        return (
+                                                            <div key={court.id} style={{
+                                                                background: 'rgba(0,0,0,0.3)',
+                                                                borderRadius: '10px',
+                                                                padding: '0.6rem 0.9rem',
+                                                                border: '1px solid #444',
+                                                                minWidth: '200px'
+                                                            }}>
+                                                                <div style={{ fontSize: '0.78rem', color: '#ccc', marginBottom: '6px' }}>{label}</div>
+                                                                <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            // A wins 6-3
+                                                                            const { updateMatch: um, updateCourt: uc } = await import('../services/firebase');
+                                                                            await um(match.id, { status: 'COMPLETED', score_a: 6, score_b: 3, winner_id: match.team_a_id });
+                                                                            await uc(parseInt(court.id), { match_id: null });
+                                                                        }}
+                                                                        style={{ background: '#1de9b6', color: '#000', border: 'none', borderRadius: '6px', padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}
+                                                                    >
+                                                                        A팀승 (6-3)
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            // B wins 3-6
+                                                                            const { updateMatch: um, updateCourt: uc } = await import('../services/firebase');
+                                                                            await um(match.id, { status: 'COMPLETED', score_a: 3, score_b: 6, winner_id: match.team_b_id });
+                                                                            await uc(parseInt(court.id), { match_id: null });
+                                                                        }}
+                                                                        style={{ background: '#82b1ff', color: '#000', border: 'none', borderRadius: '6px', padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}
+                                                                    >
+                                                                        B팀승 (3-6)
+                                                                    </button>
+                                                                    <button
+                                                                        onClick={async () => {
+                                                                            // 5:5 draw (tiebreak)
+                                                                            const { updateMatch: um, updateCourt: uc } = await import('../services/firebase');
+                                                                            await um(match.id, { status: 'COMPLETED', score_a: 5, score_b: 5, winner_id: null, tb_score_a: 7, tb_score_b: 3 });
+                                                                            await uc(parseInt(court.id), { match_id: null });
+                                                                        }}
+                                                                        style={{ background: '#ff9800', color: '#000', border: 'none', borderRadius: '6px', padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}
+                                                                    >
+                                                                        5:5 타이브레이크
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    })
+                                                }
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <p className="card-desc">운영자가 직접 점수(+/-)나 경기 상태를 변경할 수 있습니다. 변경된 점수는 대진표 모니터에 실시간 반영됩니다.</p>
 
