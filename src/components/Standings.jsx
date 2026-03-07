@@ -273,7 +273,7 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                 })}
 
                 {/* Confirm tiebreaker button */}
-                {isAdmin && allPlayed && tiedIds.size > 0 && !tieAlreadyConfirmed && (
+                {isAdmin && allGroupMatchesDone && tiedIds.size > 0 && !tieAlreadyConfirmed && (
                   <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(255,155,85,0.3)' }}>
                     <button
                       onClick={() => confirmTiebreaker(tiedIds, onConfirmTiebreaker)}
@@ -291,7 +291,7 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                     </button>
                   </div>
                 )}
-                {isAdmin && allPlayed && tieAlreadyConfirmed && (
+                {isAdmin && allGroupMatchesDone && tieAlreadyConfirmed && (
                   <div style={{ padding: '6px 12px', fontSize: '0.72rem', color: '#4caf50', textAlign: 'center' }}>
                     ✅ 나이 순위 확정 완료 — 브라켓 슬롯이 자동 업데이트됩니다
                   </div>
