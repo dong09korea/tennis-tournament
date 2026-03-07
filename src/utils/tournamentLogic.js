@@ -129,75 +129,7 @@ export const generateSchedule = (groups) => {
     return interleavedMatches;
 };
 
-/**
- * Mathematically confirmed rankings for a group.
- * Returns { 1: teamId, 2: teamId } for positions that are LOCKED IN
- * regardless of remaining match results.
- * Only 1위/2위 checked (wildcard/3위 handled separately after all groups done).
- */
-export const getConfirmedRankings = (groupMatches, groupTeams) => {
-    if (!groupMatches || groupMatches.length === 0) return {};
 
-    const incomplete = groupMatches.filter(m => m.status !== 'COMPLETED');
-
-    // If more than 4 matches remain, it's too many simulations (3^5 = 243, 3^6 = 729...)
-    // Keep it conservative: 4 matches = 81 sims.
-    if (incomplete.length > 4) return {};
-
-    // Outcome possibilities for each remaining match.
-    // We use extreme GD (6-0) and Draw (5-5) to test the boundaries.
-    const outcomes = [
-        { sa: 6, sb: 0 }, // Team A blowout win
-        { sa: 5, sb: 5 }, // Draw
-        { sa: 0, sb: 6 }  // Team B blowout win
-    ];
-
-    const simulations = [];
-    const completed = groupMatches.filter(m => m.status === 'COMPLETED');
-
-    const generate = (idx, currentSim) => {
-        if (idx === incomplete.length) {
-            simulations.push(currentSim);
-            return;
-        }
-        for (const out of outcomes) {
-            const simulatedMatch = {
-                ...incomplete[idx],
-                status: 'COMPLETED',
-                score_a: out.sa,
-                score_b: out.sb,
-                winner_id: out.sa === out.sb ? null : (out.sa > out.sb ? incomplete[idx].team_a_id : incomplete[idx].team_b_id)
-            };
-            generate(idx + 1, [...currentSim, simulatedMatch]);
-        }
-    };
-
-    generate(0, completed);
-
-    // Track which team occupies which rank across ALL simulations
-    const rankMatrix = {}; // { teamId: { rank: count } }
-
-    for (const simMatches of simulations) {
-        const gStandingsMap = calculateStandings(groupTeams, simMatches);
-        const gName = Object.keys(gStandingsMap)[0];
-        const sorted = gStandingsMap[gName] || [];
-
-        sorted.forEach((team, idx) => {
-            const rank = idx + 1;
-            if (!rankMatrix[team.id]) rankMatrix[team.id] = {};
-            rankMatrix[team.id][rank] = (rankMatrix[team.id][rank] || 0) + 1;
-        });
-    }
-
-    const total = simulations.length;
-    const confirmed = {};
-    for (const tid of Object.keys(rankMatrix)) {
-        if (rankMatrix[tid][1] === total) confirmed[1] = tid;
-        if (rankMatrix[tid][2] === total) confirmed[2] = tid;
-    }
-
-    return confirmed;
-};
 
 // Assign Matches to Courts
 // Returns updated { matches, courts }

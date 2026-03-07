@@ -6,7 +6,13 @@ import AdminDashboard from './components/AdminDashboardNew';
 import SplashScreen from './components/SplashScreen';
 
 import { subscribeToData, uploadData } from './services/firebase';
-import { assignMatchesToCourts, calculateStandings, getTop32Teams, generateBracket32, initBracket32Shell, FIXED_BRACKET_LAYOUT, getConfirmedRankings } from './utils/tournamentLogic';
+import {
+    calculateStandings,
+    isGroupMatch,
+    generateBracket32,
+    getTop32Teams,
+    FIXED_BRACKET_LAYOUT
+} from './utils/tournamentLogic';
 
 // Request notification permission on load
 const requestNotifPermission = async () => {
