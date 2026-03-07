@@ -4,26 +4,9 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
   return (
     <div className="layout-container">
       <header className="app-header">
-        <div className="header-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <span style={{ fontSize: '28px' }}>🏆</span>
-            <h1>2026년 라켓업 혼복 대회</h1>
-          </div>
-          <a href="tel:0932797810" style={{ flexShrink: 0 }}>
-            <img
-              src="/ad.png"
-              alt="DAIN 3D 프린팅"
-              style={{
-                height: '52px',
-                width: 'auto',
-                borderRadius: '8px',
-                objectFit: 'cover',
-                objectPosition: 'center top',
-                display: 'block',
-                cursor: 'pointer'
-              }}
-            />
-          </a>
+        <div className="header-content">
+          <span style={{ fontSize: '28px' }}>🏆</span>
+          <h1>2026년 라켓업 혼복 대회</h1>
         </div>
       </header>
 
@@ -51,6 +34,11 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
       <main className="app-main">
         {children}
       </main>
+
+      {/* ── Sticky Bottom Ad Banner ── */}
+      <div className="bottom-ad-banner">
+        <img src="/ad.png" alt="DAIN 3D 프린팅" className="bottom-ad-img" />
+      </div>
 
       <style>{`
         .layout-container {
@@ -104,8 +92,32 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
         }
         .app-main {
           padding: 2rem;
+          padding-bottom: calc(2rem + 72px); /* extra for banner */
           max-width: 1400px;
           margin: 0 auto;
+        }
+
+        /* ── Bottom Ad Banner ── */
+        .bottom-ad-banner {
+          position: fixed;
+          bottom: 0;
+          left: 0;
+          right: 0;
+          z-index: 200;
+          background: #fff;
+          border-top: 2px solid #1a73e8;
+          display: flex;
+          justify-content: center;
+          align-items: center;
+          height: 64px;
+          overflow: hidden;
+          box-shadow: 0 -3px 12px rgba(0,0,0,0.35);
+        }
+        .bottom-ad-img {
+          height: 100%;
+          width: 100%;
+          object-fit: cover;
+          object-position: center bottom;
         }
 
         /* Mobile Styles */
@@ -128,15 +140,19 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
           }
           .app-main {
             padding: 1rem 0.5rem;
+            padding-bottom: calc(1rem + 64px);
           }
           .header-content h1 {
             font-size: 1.4rem;
+          }
+          .bottom-ad-banner {
+            height: 56px;
           }
         }
 
         /* Print Styles */
         @media print {
-          .app-header, .tab-nav {
+          .app-header, .tab-nav, .bottom-ad-banner {
             display: none !important;
           }
           .layout-container {
@@ -149,6 +165,7 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
         }
       `}</style>
     </div>
+
   );
 };
 
