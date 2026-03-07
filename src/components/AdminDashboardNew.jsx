@@ -1198,6 +1198,20 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                         const match = data.matches.find(m => m.id === court.match_id);
                                                         const teamA = data.teams.find(t => t.id === match.team_a_id);
                                                         const teamB = data.teams.find(t => t.id === match.team_b_id);
+
+                                                        // Format match category label
+                                                        let catLabel = match.group_id;
+                                                        if (typeof match.group_id === 'number' || (typeof match.group_id === 'string' && match.group_id.includes('조'))) {
+                                                            const gNum = String(match.group_id).replace(/[^0-9]/g, '');
+                                                            const mNum = (match.id || '').split('_m')[1] || '';
+                                                            catLabel = `예선 ${gNum}조 ${mNum}번째 경기`;
+                                                        } else if (match.id && match.id.startsWith('ko')) {
+                                                            // For knockout matches, use the group_id label directly if it's one of the standard rounds
+                                                            const roundNames = ['32강', '16강', '8강', '4강', '결승'];
+                                                            const found = roundNames.find(rn => match.group_id.includes(rn));
+                                                            catLabel = found || match.group_id;
+                                                        }
+
                                                         const label = `${court.id}코트: ${teamA?.name?.split('/')[0] || '?'} vs ${teamB?.name?.split('/')[0] || '?'}`;
                                                         return (
                                                             <div key={court.id} style={{
@@ -1205,8 +1219,9 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                                 borderRadius: '10px',
                                                                 padding: '0.6rem 0.9rem',
                                                                 border: '1px solid #444',
-                                                                minWidth: '200px'
+                                                                minWidth: '220px'
                                                             }}>
+                                                                <div style={{ fontSize: '0.7rem', color: 'var(--tennis-yellow)', marginBottom: '2px', fontWeight: 'bold' }}>{catLabel}</div>
                                                                 <div style={{ fontSize: '0.78rem', color: '#ccc', marginBottom: '6px' }}>{label}</div>
                                                                 <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                                                                     <button

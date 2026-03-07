@@ -109,10 +109,25 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
     justifyContent: 'center'
   };
 
+  const getMatchCategoryLabel = () => {
+    const g = match.group_id;
+    if (typeof g === 'number' || (typeof g === 'string' && g.includes('조')) || /^\d+$/.test(String(g))) {
+      const gNum = String(g).replace(/[^0-9]/g, '');
+      const mNum = (match.id || '').split('_m')[1] || '';
+      return `예선 ${gNum}조 ${mNum}번째 경기`;
+    }
+    if (g === '본선 32강') return '32강';
+    if (g === '본선 16강 (무작위)' || g === '16강') return '16강';
+    if (g === '8강') return '8강';
+    if (g === '4강') return '4강';
+    if (g === '결승') return '결승';
+    return `${g} - R${match.round}`;
+  };
+
   return (
     <div className={`match-card ${isLive ? 'live' : ''} ${isCompleted ? 'completed' : ''}`}>
       <div className="card-header">
-        <span className="match-info">{match.group_id} - R{match.round}</span>
+        <span className="match-info">{getMatchCategoryLabel()}</span>
         <div style={{ display: 'flex', gap: '5px' }}>
           {isLive && <span className="live-badge">● 진행중</span>}
           {isCompleted && <span className="completed-badge">✓ 종료</span>}
