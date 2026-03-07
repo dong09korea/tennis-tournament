@@ -517,18 +517,17 @@ export const fillBracket32Slots = (matches, teams, standings, wildcardMap = {}) 
         const match = newMatches.find(m => m.id === `ko32_m${idx + 1}`);
         if (!match) return;
 
-        // Fill side A
-        if (match.team_a_id === 'TBD') {
+        // Sync slots for PENDING matches
+        if (match.status === 'PENDING') {
+            // Side A
             if (def.a.g === 'W') {
                 if (wildcardMap[idx] !== undefined) match.team_a_id = wildcardMap[idx];
             } else {
                 const tid = rankMap[def.a.g]?.[def.a.rank];
                 if (tid) match.team_a_id = tid;
             }
-        }
 
-        // Fill side B
-        if (match.team_b_id === 'TBD') {
+            // Side B
             if (def.b.g === 'W') {
                 if (wildcardMap[idx] !== undefined) match.team_b_id = wildcardMap[idx];
             } else {

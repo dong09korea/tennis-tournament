@@ -320,22 +320,30 @@ function App() {
 
                             let m = { ...match };
 
-                            // Fill side A
-                            if (m.team_a_id === 'TBD') {
+                            // Sync slots for PENDING matches (keeps them in line with standings)
+                            if (m.status === 'PENDING') {
+                                // Side A
                                 if (def.a.g === 'W') {
-                                    if (allGroupsDone && wildcardMap[idx]?.a) { m.team_a_id = wildcardMap[idx].a; changed = true; }
+                                    if (allGroupsDone && wildcardMap[idx]?.a && m.team_a_id !== wildcardMap[idx].a) {
+                                        m.team_a_id = wildcardMap[idx].a; changed = true;
+                                    }
                                 } else {
                                     const tid = rankMap[def.a.g]?.[def.a.rank];
-                                    if (tid) { m.team_a_id = tid; changed = true; }
+                                    if (tid && m.team_a_id !== tid) {
+                                        m.team_a_id = tid; changed = true;
+                                    }
                                 }
-                            }
-                            // Fill side B
-                            if (m.team_b_id === 'TBD') {
+
+                                // Side B
                                 if (def.b.g === 'W') {
-                                    if (allGroupsDone && wildcardMap[idx]?.b) { m.team_b_id = wildcardMap[idx].b; changed = true; }
+                                    if (allGroupsDone && wildcardMap[idx]?.b && m.team_b_id !== wildcardMap[idx].b) {
+                                        m.team_b_id = wildcardMap[idx].b; changed = true;
+                                    }
                                 } else {
                                     const tid = rankMap[def.b.g]?.[def.b.rank];
-                                    if (tid) { m.team_b_id = tid; changed = true; }
+                                    if (tid && m.team_b_id !== tid) {
+                                        m.team_b_id = tid; changed = true;
+                                    }
                                 }
                             }
                             return m;
