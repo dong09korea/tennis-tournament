@@ -45,90 +45,85 @@ export const generateGroups = (teams, numGroups = 8) => {
 };
 
 // Generate Matches (Round Robin within groups)
+// Generate Matches (Round Robin within groups)
+// This version strictly interleaves by Match Index (mIdx) across ALL groups.
+// Sequence: G1-M1, G2-M1, G3-M1... G12-M1 -> G1-M2, G2-M2...
 export const generateSchedule = (groups) => {
-    let allMatches = [];
-    let globalMatchId = 1;
+    let allMatchesPerGroup = [];
 
+    // 1. Build simple match lists for each group
     groups.forEach(group => {
         const teamIds = group.team_ids;
         const n = teamIds.length;
         if (n < 2) return;
 
-        let matchesForGroup = [];
-
+        let matchesForThisGroup = [];
         if (n === 4) {
+            // Standard order for 4-team groups
             const schedule4 = [
-                { i: 0, j: 1, r: 1 }, // 1v2 (Match 1)
-                { i: 2, j: 3, r: 1 }, // 3v4 (Match 2)
-                { i: 0, j: 2, r: 2 }, // 1v3 (Match 3)
-                { i: 1, j: 3, r: 2 }, // 2v4 (Match 4)
-                { i: 0, j: 3, r: 3 }, // 1v4 (Match 5)
-                { i: 1, j: 2, r: 3 }  // 2v3 (Match 6)
+                { i: 0, j: 1 }, // Match 1
+                { i: 2, j: 3 }, // Match 2
+                { i: 0, j: 2 }, // Match 3
+                { i: 1, j: 3 }, // Match 4
+                { i: 0, j: 3 }, // Match 5
+                { i: 1, j: 2 }  // Match 6
             ];
-
-            schedule4.forEach((match, idx) => {
-                matchesForGroup.push({
+            schedule4.forEach((pair, idx) => {
+                matchesForThisGroup.push({
                     id: `g${group.id}_m${idx + 1}`,
                     group_id: group.id,
-                    round_num: match.r, // 1, 2, or 3
                     match_in_group: idx + 1,
-                    team_a_id: teamIds[match.i],
-                    team_b_id: teamIds[match.j],
+                    team_a_id: teamIds[pair.i],
+                    team_b_id: teamIds[pair.j],
+                    status: "PENDING",
                     score_a: 0,
                     score_b: 0,
-                    status: "PENDING",
                     court_id: null,
                     winner_id: null
                 });
             });
         } else {
-            // General Round Robin permutation for non-4 groups
-            let matchIdx = 1;
+            // Fallback for non-4 groups
+            let mIdx = 1;
             for (let i = 0; i < n; i++) {
                 for (let j = i + 1; j < n; j++) {
-                    matchesForGroup.push({
-                        id: `g${group.id}_m${matchIdx}`,
+                    matchesForThisGroup.push({
+                        id: `g${group.id}_m${mIdx}`,
                         group_id: group.id,
-                        round_num: Math.ceil(matchIdx / (n / 2)),
-                        match_in_group: matchIdx,
+                        match_in_group: mIdx,
                         team_a_id: teamIds[i],
                         team_b_id: teamIds[j],
+                        status: "PENDING",
                         score_a: 0,
                         score_b: 0,
-                        status: "PENDING",
                         court_id: null,
                         winner_id: null
                     });
-                    matchIdx++;
+                    mIdx++;
                 }
             }
         }
-        allMatches.push(matchesForGroup);
+        allMatchesPerGroup.push(matchesForThisGroup);
     });
 
-    // Interleave matches across all groups
-    // e.g. Match 1 of all groups, then Match 2 of all groups...
-    let interleavedMatches = [];
-    const maxMatches = Math.max(...allMatches.map(g => g.length));
+    // 2. Interleave across all groups (Match 1 of all groups, then Match 2...)
+    let interleaved = [];
+    const maxMatchesCount = Math.max(...allMatchesPerGroup.map(g => g.length), 0);
 
-    for (let mIdx = 0; mIdx < maxMatches; mIdx++) {
-        for (let gIdx = 0; gIdx < allMatches.length; gIdx++) {
-            if (allMatches[gIdx][mIdx]) {
-                interleavedMatches.push(allMatches[gIdx][mIdx]);
+    for (let m = 0; m < maxMatchesCount; m++) {
+        for (let g = 0; g < allMatchesPerGroup.length; g++) {
+            if (allMatchesPerGroup[g][m]) {
+                interleaved.push(allMatchesPerGroup[g][m]);
             }
         }
     }
 
-    // Finalize match objects
-    interleavedMatches = interleavedMatches.map((m, idx) => {
-        const { match_in_group, ...rest } = m;
-        return {
-            ...rest,
-            round: idx + 1 // Use 'round' as the absolute sequence number for the whole UI
-        };
-    });
-
-    return interleavedMatches;
+    // 3. Assign the global 'round' (sequence) number
+    // This is used by assignMatchesToCourts and for UI display order.
+    return interleaved.map((match, index) => ({
+        ...match,
+        round: index + 1
+    }));
 };
 
 
