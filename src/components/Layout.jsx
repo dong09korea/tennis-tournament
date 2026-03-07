@@ -104,8 +104,7 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
           left: 0;
           right: 0;
           z-index: 200;
-          background: #fff;
-          border-top: 2px solid #1a73e8;
+          background: #195fc6; /* match the blue of the ad */
           display: flex;
           justify-content: center;
           align-items: center;
@@ -116,8 +115,8 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
         .bottom-ad-img {
           height: 100%;
           width: 100%;
-          object-fit: cover;
-          object-position: center bottom;
+          object-fit: contain;
+          object-position: center;
         }
 
         /* Mobile Styles */
