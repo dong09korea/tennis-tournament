@@ -1235,19 +1235,14 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                                     </button>
                                                                     <button
                                                                         onClick={async () => {
-                                                                            // 5:5 tiebreak - random tb winner
-                                                                            const tbLoser = Math.floor(Math.random() * 7); // 0~6
-                                                                            const aWins = Math.random() > 0.5;
-                                                                            const tb_a = aWins ? 7 : tbLoser;
-                                                                            const tb_b = aWins ? tbLoser : 7;
-                                                                            const winner = aWins ? match.team_a_id : match.team_b_id;
+                                                                            // 5:5 무승부 (예선은 타이브레이크 없음)
                                                                             const { updateMatch: um, updateCourt: uc } = await import('../services/firebase');
-                                                                            await um(match.id, { status: 'COMPLETED', score_a: 5, score_b: 5, winner_id: winner, tb_score_a: tb_a, tb_score_b: tb_b });
+                                                                            await um(match.id, { status: 'COMPLETED', score_a: 5, score_b: 5, winner_id: null });
                                                                             await uc(parseInt(court.id), { match_id: null });
                                                                         }}
                                                                         style={{ background: '#ff9800', color: '#000', border: 'none', borderRadius: '6px', padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}
                                                                     >
-                                                                        5:5 타이브레이제(랜덤)
+                                                                        5:5 무승부
                                                                     </button>
                                                                 </div>
                                                             </div>
