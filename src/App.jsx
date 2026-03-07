@@ -271,6 +271,27 @@ function App() {
                             if (allDone) {
                                 // Full group done: use standings
                                 const gStandings = standings[`${gNum}조`] || standings[gNum] || [];
+
+                                // ── Tie check: if any top-2-affecting tie is unresolved, skip this group ──
+                                // A tie is unresolved if two teams share pts+wins+goalDiff and NEITHER has tiebreakAge
+                                const hasUnresolvedTie = gStandings.some((t, i) =>
+                                    gStandings.some((u, j) =>
+                                        i !== j &&
+                                        t.pts === u.pts &&
+                                        t.wins === u.wins &&
+                                        t.goalDiff === u.goalDiff &&
+                                        !t.tiebreakAge && !u.tiebreakAge &&
+                                        // Only block if the tie involves at least one team in top 2
+                                        (i < 2 || j < 2)
+                                    )
+                                );
+
+                                if (hasUnresolvedTie) {
+                                    // Leave 32강 slots as TBD until admin confirms tiebreaker
+                                    console.log(`🔴 ${gNum}조: 동점 미확정 → 32강 슬롯 보류`);
+                                    return;
+                                }
+
                                 rankMap[gNum] = {};
                                 gStandings.forEach((t, i) => { rankMap[gNum][i + 1] = t.id; });
                             } else {
