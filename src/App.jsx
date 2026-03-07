@@ -298,11 +298,7 @@ function App() {
                                 rankMap[gNum] = {};
                                 gStandings.forEach((t, i) => { rankMap[gNum][i + 1] = t.id; });
                             } else {
-                                // Check mathematical clinching for 1위/2위
-                                const confirmedRanks = getConfirmedRankings(gMatches);
-                                if (confirmedRanks[1] || confirmedRanks[2]) {
-                                    rankMap[gNum] = { ...confirmedRanks };
-                                }
+                                // Not all matches done → skip, wait for full completion
                             }
                         });
 
