@@ -177,7 +177,7 @@ function App() {
                 const linkedMatch = newData.matches.find(m => m.id === c.match_id);
                 return !linkedMatch || linkedMatch.status !== 'LIVE';
             });
-            const hasPendingMatches = newData.matches.some(m => m.status === 'PENDING' && !m.court_id);
+            const hasPendingMatches = newData.matches.some(m => m.status === 'PENDING');
 
             if (hasEmptyCourts && hasPendingMatches) {
                 if (assignDebounceRef.current) clearTimeout(assignDebounceRef.current);
@@ -189,7 +189,7 @@ function App() {
                         const { matches: nextMatches, courts: nextCourts } = assignMatchesToCourts(freshestData.matches, freshestData.courts);
                         const changed = nextCourts.some((c, i) => c.match_id !== freshestData.courts[i]?.match_id);
 
-                        if (changed) {
+                        if (changed && isAdmin) {
                             await uploadData({ ...freshestData, matches: nextMatches, courts: nextCourts });
                         }
                     } catch (e) {

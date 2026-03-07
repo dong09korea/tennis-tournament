@@ -61,6 +61,7 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
       else if (scoreB > scoreA) newWinnerId = match.team_b_id;
 
       updates.winner_id = newWinnerId;
+      updates.court_id = null; // Explicitly clear court_id on completion
 
       // Free the court if the match was assigned to one
       if (match.court_id) {
@@ -68,6 +69,7 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
       }
     } else {
       updates.winner_id = null; // Reset winner if not completed
+      updates.court_id = null;  // Also clear court_id if reset to PENDING
     }
 
     await updateMatch(match.id, updates);

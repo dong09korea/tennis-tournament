@@ -1229,7 +1229,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                                             // A wins - random score
                                                                             const loserScore = Math.floor(Math.random() * 6); // 0~5
                                                                             const { updateMatch: um, updateCourt: uc } = await import('../services/firebase');
-                                                                            await um(match.id, { status: 'COMPLETED', score_a: 6, score_b: loserScore, winner_id: match.team_a_id });
+                                                                            await um(match.id, { status: 'COMPLETED', score_a: 6, score_b: loserScore, winner_id: match.team_a_id, court_id: null });
                                                                             await uc(parseInt(court.id), { match_id: null });
                                                                         }}
                                                                         style={{ background: '#1de9b6', color: '#000', border: 'none', borderRadius: '6px', padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}
@@ -1241,7 +1241,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                                             // B wins - random score
                                                                             const loserScore = Math.floor(Math.random() * 6); // 0~5
                                                                             const { updateMatch: um, updateCourt: uc } = await import('../services/firebase');
-                                                                            await um(match.id, { status: 'COMPLETED', score_a: loserScore, score_b: 6, winner_id: match.team_b_id });
+                                                                            await um(match.id, { status: 'COMPLETED', score_a: loserScore, score_b: 6, winner_id: match.team_b_id, court_id: null });
                                                                             await uc(parseInt(court.id), { match_id: null });
                                                                         }}
                                                                         style={{ background: '#82b1ff', color: '#000', border: 'none', borderRadius: '6px', padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}
@@ -1252,7 +1252,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                                         onClick={async () => {
                                                                             // 5:5 무승부 (예선은 타이브레이크 없음)
                                                                             const { updateMatch: um, updateCourt: uc } = await import('../services/firebase');
-                                                                            await um(match.id, { status: 'COMPLETED', score_a: 5, score_b: 5, winner_id: null });
+                                                                            await um(match.id, { status: 'COMPLETED', score_a: 5, score_b: 5, winner_id: null, court_id: null });
                                                                             await uc(parseInt(court.id), { match_id: null });
                                                                         }}
                                                                         style={{ background: '#ff9800', color: '#000', border: 'none', borderRadius: '6px', padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}

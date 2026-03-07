@@ -166,7 +166,6 @@ export const assignMatchesToCourts = (matches, courts) => {
     // so those naturally stay out of court assignment until the right moment.
     let pendingMatches = nextMatches.filter(m =>
         m.status === 'PENDING' &&
-        !m.court_id &&
         m.team_a_id !== 'TBD' && m.team_a_id !== 'BYE' &&
         m.team_b_id !== 'TBD' && m.team_b_id !== 'BYE'
     );
