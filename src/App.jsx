@@ -177,7 +177,7 @@ function App() {
                 const linkedMatch = newData.matches.find(m => m.id === c.match_id);
                 return !linkedMatch || linkedMatch.status !== 'LIVE';
             });
-            const hasPendingMatches = newData.matches.some(m => m.status === 'PENDING');
+            const hasPendingMatches = newData.matches.some(m => m.status === 'PENDING' && !m.court_id);
 
             if (hasEmptyCourts && hasPendingMatches) {
                 if (assignDebounceRef.current) clearTimeout(assignDebounceRef.current);
@@ -189,13 +189,13 @@ function App() {
                         const { matches: nextMatches, courts: nextCourts } = assignMatchesToCourts(freshestData.matches, freshestData.courts);
                         const changed = nextCourts.some((c, i) => c.match_id !== freshestData.courts[i]?.match_id);
 
-                        if (changed && isAdmin) {
+                        if (changed) {
                             await uploadData({ ...freshestData, matches: nextMatches, courts: nextCourts });
                         }
                     } catch (e) {
                         console.error('Auto assign error', e);
                     }
-                }, 1000);
+                }, 100);
             }
 
             // ── Progressive 32-bracket slot filling ─────────────────────────
@@ -230,7 +230,7 @@ function App() {
                         const shell = initBracket32Shell();
                         await uploadData({ ...fd, matches: [...fd.matches, ...shell] });
                         console.log('✅ 32강 브라켓 틀 생성 완료 (첫 번째 조 완료 시)');
-                    }, 800);
+                    }, 100);
                 }
 
                 // Step 2: Fill slots for completed groups + all-done wildcard fill
@@ -352,9 +352,9 @@ function App() {
                         if (changed) {
                             const { matches: assigned, courts: assignedCourts } = assignMatchesToCourts(updatedMatches, fd.courts);
                             await uploadData({ ...fd, matches: assigned, courts: assignedCourts });
-                            console.log('✅ 32강 슬롯 업데이트 완료');
+                            console.log('✅ 32강 슬롯 업데이트 및 코트 배정 완료');
                         }
-                    }, 1200);
+                    }, 100);
                 }
             }
 

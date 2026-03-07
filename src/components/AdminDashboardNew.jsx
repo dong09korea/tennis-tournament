@@ -1198,20 +1198,6 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                         const match = data.matches.find(m => m.id === court.match_id);
                                                         const teamA = data.teams.find(t => t.id === match.team_a_id);
                                                         const teamB = data.teams.find(t => t.id === match.team_b_id);
-
-                                                        // Format match category label
-                                                        let catLabel = match.group_id;
-                                                        if (typeof match.group_id === 'number' || (typeof match.group_id === 'string' && match.group_id.includes('조'))) {
-                                                            const gNum = String(match.group_id).replace(/[^0-9]/g, '');
-                                                            const mNum = (match.id || '').split('_m')[1] || '';
-                                                            catLabel = `예선 ${gNum}조 ${mNum}번째 경기`;
-                                                        } else if (match.id && match.id.startsWith('ko')) {
-                                                            // For knockout matches, use the group_id label directly if it's one of the standard rounds
-                                                            const roundNames = ['32강', '16강', '8강', '4강', '결승'];
-                                                            const found = roundNames.find(rn => match.group_id.includes(rn));
-                                                            catLabel = found || match.group_id;
-                                                        }
-
                                                         const label = `${court.id}코트: ${teamA?.name?.split('/')[0] || '?'} vs ${teamB?.name?.split('/')[0] || '?'}`;
                                                         return (
                                                             <div key={court.id} style={{
@@ -1219,9 +1205,8 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                                 borderRadius: '10px',
                                                                 padding: '0.6rem 0.9rem',
                                                                 border: '1px solid #444',
-                                                                minWidth: '220px'
+                                                                minWidth: '200px'
                                                             }}>
-                                                                <div style={{ fontSize: '0.7rem', color: 'var(--tennis-yellow)', marginBottom: '2px', fontWeight: 'bold' }}>{catLabel}</div>
                                                                 <div style={{ fontSize: '0.78rem', color: '#ccc', marginBottom: '6px' }}>{label}</div>
                                                                 <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                                                                     <button
@@ -1229,7 +1214,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                                             // A wins - random score
                                                                             const loserScore = Math.floor(Math.random() * 6); // 0~5
                                                                             const { updateMatch: um, updateCourt: uc } = await import('../services/firebase');
-                                                                            await um(match.id, { status: 'COMPLETED', score_a: 6, score_b: loserScore, winner_id: match.team_a_id, court_id: null });
+                                                                            await um(match.id, { status: 'COMPLETED', score_a: 6, score_b: loserScore, winner_id: match.team_a_id });
                                                                             await uc(parseInt(court.id), { match_id: null });
                                                                         }}
                                                                         style={{ background: '#1de9b6', color: '#000', border: 'none', borderRadius: '6px', padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}
@@ -1241,7 +1226,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                                             // B wins - random score
                                                                             const loserScore = Math.floor(Math.random() * 6); // 0~5
                                                                             const { updateMatch: um, updateCourt: uc } = await import('../services/firebase');
-                                                                            await um(match.id, { status: 'COMPLETED', score_a: loserScore, score_b: 6, winner_id: match.team_b_id, court_id: null });
+                                                                            await um(match.id, { status: 'COMPLETED', score_a: loserScore, score_b: 6, winner_id: match.team_b_id });
                                                                             await uc(parseInt(court.id), { match_id: null });
                                                                         }}
                                                                         style={{ background: '#82b1ff', color: '#000', border: 'none', borderRadius: '6px', padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}
@@ -1252,7 +1237,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                                         onClick={async () => {
                                                                             // 5:5 무승부 (예선은 타이브레이크 없음)
                                                                             const { updateMatch: um, updateCourt: uc } = await import('../services/firebase');
-                                                                            await um(match.id, { status: 'COMPLETED', score_a: 5, score_b: 5, winner_id: null, court_id: null });
+                                                                            await um(match.id, { status: 'COMPLETED', score_a: 5, score_b: 5, winner_id: null });
                                                                             await uc(parseInt(court.id), { match_id: null });
                                                                         }}
                                                                         style={{ background: '#ff9800', color: '#000', border: 'none', borderRadius: '6px', padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}

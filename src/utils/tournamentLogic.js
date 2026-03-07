@@ -70,7 +70,8 @@ export const generateSchedule = (groups) => {
                 matchesForGroup.push({
                     id: `g${group.id}_m${idx + 1}`,
                     group_id: group.id,
-                    match_in_group: idx + 1, // e.g., 1st match of the group, 2nd match...
+                    round_num: match.r, // 1, 2, or 3
+                    match_in_group: idx + 1,
                     team_a_id: teamIds[match.i],
                     team_b_id: teamIds[match.j],
                     score_a: 0,
@@ -88,6 +89,7 @@ export const generateSchedule = (groups) => {
                     matchesForGroup.push({
                         id: `g${group.id}_m${matchIdx}`,
                         group_id: group.id,
+                        round_num: Math.ceil(matchIdx / (n / 2)),
                         match_in_group: matchIdx,
                         team_a_id: teamIds[i],
                         team_b_id: teamIds[j],
@@ -104,15 +106,28 @@ export const generateSchedule = (groups) => {
         allMatches.push(matchesForGroup);
     });
 
-    // Interleave matches across all groups
-    // e.g. Group 1 Match 1, Group 2 Match 1 ... Group N Match 1, Group 1 Match 2 ...
-    let interleavedMatches = [];
-    const maxMatches = Math.max(...allMatches.map(g => g.length)); // Max number of matches any group has
+    // 1. Group matches into Rounds (e.g. Round 1, Round 2...) within each group list
+    const groupedByRoundPerGroup = allMatches.map(groupMatches => {
+        const rounds = {};
+        groupMatches.forEach(m => {
+            const r = m.round_num || 1; // Assuming we add round_num to match object in generate logic
+            if (!rounds[r]) rounds[r] = [];
+            rounds[r].push(m);
+        });
+        return Object.values(rounds); // List of round-match-arrays
+    });
 
-    for (let mIdx = 0; mIdx < maxMatches; mIdx++) {
-        for (let gIdx = 0; gIdx < allMatches.length; gIdx++) {
-            if (allMatches[gIdx][mIdx]) {
-                interleavedMatches.push(allMatches[gIdx][mIdx]);
+    // 2. Interleave the Rounds across all groups
+    // e.g. G1(Round 1), G2(Round 1) ... G1(Round 2), G2(Round 2) ...
+    let interleavedMatches = [];
+    const maxRounds = Math.max(...groupedByRoundPerGroup.map(g => g.length));
+
+    for (let rIdx = 0; rIdx < maxRounds; rIdx++) {
+        for (let gIdx = 0; gIdx < groupedByRoundPerGroup.length; gIdx++) {
+            const currentGroupRounds = groupedByRoundPerGroup[gIdx];
+            if (currentGroupRounds[rIdx]) {
+                // Add all matches for this group's specific round
+                interleavedMatches.push(...currentGroupRounds[rIdx]);
             }
         }
     }
@@ -166,6 +181,7 @@ export const assignMatchesToCourts = (matches, courts) => {
     // so those naturally stay out of court assignment until the right moment.
     let pendingMatches = nextMatches.filter(m =>
         m.status === 'PENDING' &&
+        !m.court_id &&
         m.team_a_id !== 'TBD' && m.team_a_id !== 'BYE' &&
         m.team_b_id !== 'TBD' && m.team_b_id !== 'BYE'
     );
