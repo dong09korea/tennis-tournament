@@ -1211,36 +1211,43 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                                 <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                                                                     <button
                                                                         onClick={async () => {
-                                                                            // A wins 6-3
+                                                                            // A wins - random score
+                                                                            const loserScore = Math.floor(Math.random() * 6); // 0~5
                                                                             const { updateMatch: um, updateCourt: uc } = await import('../services/firebase');
-                                                                            await um(match.id, { status: 'COMPLETED', score_a: 6, score_b: 3, winner_id: match.team_a_id });
+                                                                            await um(match.id, { status: 'COMPLETED', score_a: 6, score_b: loserScore, winner_id: match.team_a_id });
                                                                             await uc(parseInt(court.id), { match_id: null });
                                                                         }}
                                                                         style={{ background: '#1de9b6', color: '#000', border: 'none', borderRadius: '6px', padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}
                                                                     >
-                                                                        A팀승 (6-3)
+                                                                        A팀승 (랜덤)
                                                                     </button>
                                                                     <button
                                                                         onClick={async () => {
-                                                                            // B wins 3-6
+                                                                            // B wins - random score
+                                                                            const loserScore = Math.floor(Math.random() * 6); // 0~5
                                                                             const { updateMatch: um, updateCourt: uc } = await import('../services/firebase');
-                                                                            await um(match.id, { status: 'COMPLETED', score_a: 3, score_b: 6, winner_id: match.team_b_id });
+                                                                            await um(match.id, { status: 'COMPLETED', score_a: loserScore, score_b: 6, winner_id: match.team_b_id });
                                                                             await uc(parseInt(court.id), { match_id: null });
                                                                         }}
                                                                         style={{ background: '#82b1ff', color: '#000', border: 'none', borderRadius: '6px', padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}
                                                                     >
-                                                                        B팀승 (3-6)
+                                                                        B팀승 (랜덤)
                                                                     </button>
                                                                     <button
                                                                         onClick={async () => {
-                                                                            // 5:5 draw (tiebreak)
+                                                                            // 5:5 tiebreak - random tb winner
+                                                                            const tbLoser = Math.floor(Math.random() * 7); // 0~6
+                                                                            const aWins = Math.random() > 0.5;
+                                                                            const tb_a = aWins ? 7 : tbLoser;
+                                                                            const tb_b = aWins ? tbLoser : 7;
+                                                                            const winner = aWins ? match.team_a_id : match.team_b_id;
                                                                             const { updateMatch: um, updateCourt: uc } = await import('../services/firebase');
-                                                                            await um(match.id, { status: 'COMPLETED', score_a: 5, score_b: 5, winner_id: null, tb_score_a: 7, tb_score_b: 3 });
+                                                                            await um(match.id, { status: 'COMPLETED', score_a: 5, score_b: 5, winner_id: winner, tb_score_a: tb_a, tb_score_b: tb_b });
                                                                             await uc(parseInt(court.id), { match_id: null });
                                                                         }}
                                                                         style={{ background: '#ff9800', color: '#000', border: 'none', borderRadius: '6px', padding: '3px 8px', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 700 }}
                                                                     >
-                                                                        5:5 타이브레이크
+                                                                        5:5 타이브레이제(랜덤)
                                                                     </button>
                                                                 </div>
                                                             </div>
