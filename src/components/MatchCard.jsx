@@ -48,7 +48,8 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
     return null;
   };
 
-  const isKnockout = typeof match.group_id === 'string' && match.group_id.includes('본선');
+  const isGroupStageMatch = (m) => typeof m.group_id === 'number' || (typeof m.group_id === 'string' && m.group_id.includes('조')) || /^\d+$/.test(String(m.group_id));
+  const isKnockout = !isGroupStageMatch(match);
 
   const handleScore = async (team, delta) => {
     const field = team === 'A' ? 'score_a' : 'score_b';
@@ -61,9 +62,14 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
     let newWinnerId = null;
 
     if (newStatus === 'COMPLETED') {
-        // Simple logic: higher score wins
         const scoreA = match.score_a || 0;
         const scoreB = match.score_b || 0;
+
+        if (isKnockout && scoreA === scoreB) {
+            alert('본선 토너먼트는 무승부가 없습니다. 승패(타이브레이크 결과 등)를 실시간 점수판에서 입력하시거나, 임의로 승자의 점수를 올려주세요.');
+            return;
+        }
+
         if (scoreA > scoreB) newWinnerId = match.team_a_id;
         else if (scoreB > scoreA) newWinnerId = match.team_b_id;
 

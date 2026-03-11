@@ -189,10 +189,10 @@ function App() {
                 
                 // Capture the current snapshot data in closure
                 const capturedData = { matches: [...newData.matches], courts: [...newData.courts] };
-                document.title = "T-SET";
+                // document.title = "T-SET";
                 
                 assignDebounceRef.current = setTimeout(async () => {
-                    document.title = "T-FIRE";
+                    // document.title = "T-FIRE";
                     console.log(`[AutoAssign Timer Fired]`);
                     try {
                         const { matches: nextMatches, courts: nextCourts } = assignMatchesToCourts(capturedData.matches, capturedData.courts);
@@ -204,12 +204,12 @@ function App() {
                             return oldM && (m.status !== oldM.status || m.court_id !== oldM.court_id);
                         });
 
-                        document.title = `ALG-${changedCourts.length}`;
+                        // document.title = `ALG-${changedCourts.length}`;
                         console.log(`[AutoAssign Check] Changed matches: ${changedMatches.length}, Changed courts: ${changedCourts.length}`);
 
                         if (changedCourts.length > 0 || changedMatches.length > 0) {
                             console.log(`[AutoAssign Executing] Updating ${changedCourts.length} courts and ${changedMatches.length} matches.`);
-                            document.title = 'DB-UP...';
+                            // document.title = 'DB-UP...';
                             const promises = [];
                             
                             changedCourts.forEach(c => {
@@ -221,11 +221,11 @@ function App() {
                             });
 
                             await Promise.all(promises);
-                            document.title = 'DB-DONE';
+                            // document.title = 'DB-DONE';
                             console.log(`[AutoAssign Success] Firebase updated.`);
                         }
                     } catch (e) {
-                        document.title = 'ERR:' + (e.message || 'unknown').substring(0, 15);
+                        // document.title = 'ERR:' + (e.message || 'unknown').substring(0, 15);
                         console.error('[AutoAssign Error]', e);
                     }
                 }, 1000); // 1초(1000ms)로 변경하여 안정성 확보
