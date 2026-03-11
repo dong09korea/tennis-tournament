@@ -186,8 +186,10 @@ function App() {
                 
                 // Capture the current snapshot data in closure
                 const capturedData = { matches: [...newData.matches], courts: [...newData.courts] };
+                setDebugMsg('TIMER SET, WAITING...');
                 
                 assignDebounceRef.current = setTimeout(async () => {
+                    setDebugMsg('TIMER FIRED!');
                     console.log(`[AutoAssign Timer Fired]`);
                     try {
                         const { matches: nextMatches, courts: nextCourts } = assignMatchesToCourts(capturedData.matches, capturedData.courts);
@@ -199,10 +201,12 @@ function App() {
                             return oldM && (m.status !== oldM.status || m.court_id !== oldM.court_id);
                         });
 
+                        setDebugMsg(`ALG OUT: ${changedCourts.length}C, ${changedMatches.length}M`);
                         console.log(`[AutoAssign Check] Changed matches: ${changedMatches.length}, Changed courts: ${changedCourts.length}`);
 
                         if (changedCourts.length > 0 || changedMatches.length > 0) {
                             console.log(`[AutoAssign Executing] Updating ${changedCourts.length} courts and ${changedMatches.length} matches.`);
+                            setDebugMsg('UPLOADING TO DB...');
                             const promises = [];
                             
                             changedCourts.forEach(c => {
@@ -214,9 +218,11 @@ function App() {
                             });
 
                             await Promise.all(promises);
+                            setDebugMsg('DB UPDATE SUCCESS');
                             console.log(`[AutoAssign Success] Firebase updated.`);
                         }
                     } catch (e) {
+                        setDebugMsg(`ERROR: ${e.message}`);
                         console.error('[AutoAssign Error]', e);
                     }
                 }, 500); // reduced timeout to feel snappier
@@ -679,6 +685,27 @@ function App() {
                     <div>Empty: {data.courts.some(c => c.match_id === null || !data.matches.find(m => m.id === c.match_id && m.status === 'LIVE')) ? 'YES' : 'NO'}</div>
                     <div>Pending: {data.matches.some(m => m.status === 'PENDING' && !m.court_id) ? 'YES' : 'NO'}</div>
                     <div>Wait, if YES YES... why no assign?</div>
+                </div>
+                {/* ---- DEBUG OVERLAY ---- */}
+                <div style={{
+                    position: 'fixed', bottom: '10px', left: '10px', zIndex: 10000,
+                    background: 'rgba(0,0,0,0.85)', color: '#0f0', padding: '12px',
+                    borderRadius: '5px', fontSize: '12px', fontFamily: 'monospace',
+                    pointerEvents: 'none', border: '2px solid #0f0', whiteSpace: 'pre-wrap'
+                }}>
+                    <div>Data: {data.matches.length} matches, {data.courts.length} courts</div>
+                    <div>Admin: {isAdmin ? 'YES' : 'NO'}</div>
+                    <div>Empty: {data.courts.some(c => c.match_id === null || !data.matches.find(m => m.id === c.match_id && m.status === 'LIVE')) ? 'YES' : 'NO'}</div>
+                    <div>Pending: {data.matches.some(m => m.status === 'PENDING' && !m.court_id) ? 'YES' : 'NO'}</div>
+                    <div style={{color: '#ff0', marginTop: '5px'}}>Status: {debugMsg}</div>
+                    <div style={{marginTop: '5px'}}>
+                        {(() => {
+                            if (!isAdmin) return "Admin required for auto-assign.";
+                            const testAssign = assignMatchesToCourts([...data.matches], [...data.courts]);
+                            const diff = testAssign.courts.filter(c => c.match_id !== data.courts.find(oc => oc.id === c.id)?.match_id);
+                            return `Alg would change ${diff.length} courts locally right now`;
+                        })()}
+                    </div>
                 </div>
             </Layout>
         </>
