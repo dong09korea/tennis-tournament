@@ -38,6 +38,31 @@ const getTiedTeamIds = (sortedTeams) => {
   return tied;
 };
 
+// Group tied teams into independent arrays based on identical score stats
+const getTiedGroups = (sortedTeams) => {
+  const groups = [];
+  let currentGroup = [];
+  
+  for (let i = 0; i < sortedTeams.length; i++) {
+    const t = sortedTeams[i];
+    if (t.played === 0) continue;
+    
+    if (currentGroup.length === 0) {
+      currentGroup.push(t);
+    } else {
+      const prev = currentGroup[0];
+      if (t.pts === prev.pts && t.wins === prev.wins && t.goalDiff === prev.goalDiff) {
+        currentGroup.push(t);
+      } else {
+        if (currentGroup.length > 1) groups.push(currentGroup);
+        currentGroup = [t];
+      }
+    }
+  }
+  if (currentGroup.length > 1) groups.push(currentGroup);
+  return groups;
+};
+
 const getWildcardIds = (allSortedGroups, tiebreakAges) => {
   const thirdPlacers = [];
   Object.values(allSortedGroups).forEach(groupTeams => {
@@ -336,6 +361,13 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
             }
 
             const tiedIds = getTiedTeamIds(thirdPlacers);
+            const tiedGroups = getTiedGroups(thirdPlacers);
+            const buttonPlacementMap = {};
+            tiedGroups.forEach(grp => {
+                const lastId = grp[grp.length - 1].id;
+                buttonPlacementMap[lastId] = grp;
+            });
+
             const allGroupMatchesDone = (matches || []).length > 0 && (matches || []).filter(m => m.group_id && String(m.group_id).includes('조')).every(m => m.status === 'COMPLETED');
 
             return (
@@ -357,7 +389,8 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
               const p2 = parts[1] || '';
 
               return (
-                <div key={team.id} className={`sc-row ${rowMod}`}>
+                <React.Fragment key={team.id + "_wrap"}>
+                <div className={`sc-row ${rowMod}`}>
                   <div className="sc-rank" style={{ width: 44, textAlign: 'center' }}>
                     {index + 1}
                   </div>
@@ -412,61 +445,51 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                     {goalDiff > 0 ? `+${goalDiff}` : goalDiff}
                   </div>
                 </div>
+                {(() => {
+                  const tiedGroup = buttonPlacementMap[team.id];
+                  if (tiedGroup && isAdmin && allGroupMatchesDone) {
+                     const groupIds = tiedGroup.map(t => t.id);
+                     const allAgesEntered = groupIds.every(id => tiebreakAges[id] !== undefined);
+                     const tieAlreadyConfirmed = groupIds.every(id => {
+                         const t = thirdPlacers.find(x => x.id === id);
+                         return t?.tiebreakAge !== undefined;
+                     });
+
+                     if (tieAlreadyConfirmed) {
+                        return (
+                          <div className="tied-group-action" style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', textAlign: 'center', fontSize: '0.8rem', color: '#4caf50', fontWeight: 'bold' }}>
+                            ✅ [{tiedGroup.map(t => String(t.group_id || t.initial_group || '').replace('조','')).join(', ')}조 동점팀] — 나이 순위 (슬롯 배치) 반영 완료
+                          </div>
+                        );
+                     } else {
+                        return (
+                          <div className="tied-group-action" style={{ background: 'rgba(0,0,0,0.2)', padding: '10px 12px' }}>
+                            <button
+                              onClick={async () => {
+                                await confirmTiebreaker(new Set(groupIds), onConfirmTiebreaker);
+                                if (onPushWildcardsToBracket) onPushWildcardsToBracket();
+                              }}
+                              disabled={confirming || !allAgesEntered}
+                              style={{
+                                width: '100%', padding: '12px', fontSize: '0.9rem', fontWeight: 700,
+                                background: allAgesEntered ? 'linear-gradient(135deg,#1de9b6,#00bfa5)' : '#555',
+                                color: allAgesEntered ? '#000' : '#aaa',
+                                border: 'none', borderRadius: '8px',
+                                cursor: confirming ? 'wait' : (!allAgesEntered ? 'not-allowed' : 'pointer'),
+                                transition: 'all 0.2s', boxShadow: allAgesEntered ? '0 4px 15px rgba(29,233,182,0.4)' : 'none'
+                              }}
+                            >
+                              {confirming ? '저장 중...' : (!allAgesEntered ? '⚠️ 위 동점팀들의 합산나이를 모두 입력해주세요' : `🏆 [${tiedGroup.map(t => String(t.group_id || t.initial_group || '').replace('조','')).join(', ')}조 동점팀] — 나이 확정 및 32강 배치 대상 포함`)}
+                            </button>
+                          </div>
+                        );
+                     }
+                  }
+                  return null;
+                })()}
+                </React.Fragment>
               );
             })}
-                
-            {/* Confirm tiebreaker button for Wildcards */}
-            {isAdmin && allGroupMatchesDone && tiedIds.size > 0 && (() => {
-              const allTiedAgesEntered = [...tiedIds].every(id => tiebreakAges[id] !== undefined);
-              const tieAlreadyConfirmed = [...tiedIds].every(id => {
-                const t = thirdPlacers.find(t => t.id === id);
-                return t?.tiebreakAge !== undefined;
-              });
-
-              if (tieAlreadyConfirmed) {
-                return (
-                  <div style={{ padding: '12px', fontSize: '0.8rem', color: '#4caf50', textAlign: 'center', fontWeight: 'bold' }}>
-                    ✅ 와일드카드 나이 순위 확정 완료
-                  </div>
-                );
-              }
-
-              return (
-                <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(255,155,85,0.3)' }}>
-                  <button
-                    onClick={() => confirmTiebreaker(tiedIds, onConfirmTiebreaker)}
-                    disabled={confirming || !allTiedAgesEntered}
-                    style={{
-                      width: '100%', padding: '10px', fontSize: '0.85rem', fontWeight: 700,
-                      background: allTiedAgesEntered ? 'linear-gradient(135deg,#4caf50,#2e7d32)' : '#555',
-                      color: allTiedAgesEntered ? '#fff' : '#aaa',
-                      border: 'none', borderRadius: '6px',
-                      cursor: confirming ? 'wait' : (!allTiedAgesEntered ? 'not-allowed' : 'pointer'),
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    {confirming ? '저장 중...' : (!allTiedAgesEntered ? '⚠️ 동점팀의 합산나이를 모두 입력해주세요' : '✅ 동점팀 나이 순위 확정 (저장)')}
-                  </button>
-                </div>
-              );
-            })()}
-
-            {/* Separate button: Push wildcards to 32 bracket */}
-            {isAdmin && allGroupMatchesDone && (
-              <div style={{ padding: '15px 12px', borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: '5px' }}>
-                  <button
-                    onClick={() => onPushWildcardsToBracket && onPushWildcardsToBracket()}
-                    style={{
-                      width: '100%', padding: '14px', fontSize: '1rem', fontWeight: 800,
-                      background: 'linear-gradient(135deg, #1de9b6, #00bfa5)',
-                      color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer',
-                      boxShadow: '0 4px 15px rgba(29,233,182,0.4)', transition: 'all 0.2s'
-                    }}
-                  >
-                    🏆 와일드카드 32강 본선 진출 확정 (슬롯 배치)
-                  </button>
-              </div>
-            )}
             </>
           );
         })()}

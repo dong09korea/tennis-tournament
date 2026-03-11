@@ -144,6 +144,12 @@ export const generateSchedule = (groups) => {
 
 
 
+// Utility to identify if a match is a group-stage match
+export const isGroupMatch = (m) => {
+    const g = m.group_id;
+    return typeof g === 'number' || (typeof g === 'string' && g.includes('조')) || /^\d+$/.test(String(g));
+};
+
 // Assign Matches to Courts
 // Returns updated { matches, courts }
 export const assignMatchesToCourts = (matches, courts) => {

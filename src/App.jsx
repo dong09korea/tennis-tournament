@@ -139,12 +139,8 @@ function App() {
 
         // ── Tie detection: alert admin when a group finishes with tied teams ──
         if (isAdmin && newData.matches && newData.teams) {
-            const isGroupMatchFn = (m) => {
-                const g = m.group_id;
-                return typeof g === 'number' || (typeof g === 'string' && g.includes('조')) || /^\d+$/.test(String(g));
-            };
             const byGroup = {};
-            newData.matches.filter(isGroupMatchFn).forEach(m => {
+            newData.matches.filter(isGroupMatch).forEach(m => {
                 if (!byGroup[m.group_id]) byGroup[m.group_id] = [];
                 byGroup[m.group_id].push(m);
             });
@@ -230,10 +226,6 @@ function App() {
 
             // ── Progressive 32-bracket slot filling ─────────────────────────
             const knockoutGroups = ['본선 32강', '16강', '8강', '4강', '결승', '본선 16강 (무작위)'];
-            const isGroupMatch = (m) => {
-                const g = m.group_id;
-                return typeof g === 'number' || (typeof g === 'string' && g.includes('조')) || /^\d+$/.test(String(g));
-            };
             const groupMatches = newData.matches.filter(isGroupMatch);
             const bracketShellExists = newData.matches.some(m => m.group_id === '본선 32강');
 
