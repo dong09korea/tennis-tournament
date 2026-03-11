@@ -5,7 +5,7 @@ import Standings from './components/Standings';
 import AdminDashboard from './components/AdminDashboardNew';
 import SplashScreen from './components/SplashScreen';
 
-import { subscribeToData, uploadData } from './services/firebase';
+import { subscribeToData, uploadData, updateCourt, updateMatch } from './services/firebase';
 import {
     calculateStandings,
     isGroupMatch,
@@ -187,10 +187,24 @@ function App() {
                         if (!freshestData || !freshestData.matches || !freshestData.courts) return;
 
                         const { matches: nextMatches, courts: nextCourts } = assignMatchesToCourts(freshestData.matches, freshestData.courts);
-                        const changed = nextCourts.some((c, i) => c.match_id !== freshestData.courts[i]?.match_id);
+                        
+                        // Extract only the courts and matches that actually changed to save Firebase writes
+                        const changedCourts = nextCourts.filter((c, i) => c.match_id !== freshestData.courts[i]?.match_id);
+                        const changedMatches = nextMatches.filter((m, i) => m.status !== freshestData.matches[i]?.status || m.court_id !== freshestData.matches[i]?.court_id);
 
-                        if (changed) {
-                            await uploadData({ ...freshestData, matches: nextMatches, courts: nextCourts });
+                        if (changedCourts.length > 0 || changedMatches.length > 0) {
+                            console.log(`AutoAssign: Updating ${changedCourts.length} courts and ${changedMatches.length} matches.`);
+                            const promises = [];
+                            
+                            changedCourts.forEach(c => {
+                                promises.push(updateCourt(c.id, { match_id: c.match_id }));
+                            });
+                            
+                            changedMatches.forEach(m => {
+                                promises.push(updateMatch(m.id, { status: m.status, court_id: m.court_id }));
+                            });
+
+                            await Promise.all(promises);
                         }
                     } catch (e) {
                         console.error('Auto assign error', e);
