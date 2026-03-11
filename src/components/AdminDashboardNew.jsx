@@ -213,6 +213,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
 
             const newData = { teams, groups, matches: assignedMatches, courts: assignedCourts };
 
+            await resetTournamentData(); // Clean out orphaned docs before rewriting
             await uploadData(newData);
             setStatusMsg("✅ 대회 생성 및 업로드 완료!");
             setTimeout(() => setStatusMsg(""), 3000);
