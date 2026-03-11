@@ -99,7 +99,7 @@ export const uploadData = async (data) => {
             return;
         }
 
-        const BATCH_SIZE = 400;
+        const BATCH_SIZE = 50; // 더 잘게 쪼개서 서버 부하 방지
         const totalBatches = Math.ceil(totalOps / BATCH_SIZE);
         console.log(`Uploading ${totalOps} operations in ${totalBatches} batches...`);
         
@@ -114,12 +114,17 @@ export const uploadData = async (data) => {
 
             let timerId;
             const timeout = new Promise((_, reject) => {
-                timerId = setTimeout(() => reject(new Error(`🔥 서버 저장속도가 너무 느립니다 (60초 초과).`)), 60000);
+                timerId = setTimeout(() => reject(new Error(`🔥 서버 저장속도가 너무 느립니다 (120초 초과).`)), 120000);
             });
 
             await Promise.race([batch.commit(), timeout]);
             clearTimeout(timerId);
             console.log(`[Firebase] Batch ${i + 1}/${totalBatches} complete.`);
+            
+            // 각 배치 사이 0.5초 대기 (서버 부하 분산)
+            if (i < totalBatches - 1) {
+                await new Promise(res => setTimeout(res, 500));
+            }
         }
 
         console.log("Full upload successful!");
@@ -171,12 +176,16 @@ export const resetTournamentData = async () => {
             COLLECTIONS.COURTS
         ];
 
-        // Parallelize clearing across different collections
-        const clearPromises = collectionsToClear.map(async (colName) => {
+        // 병렬 처리가 아닌 '순차적' 처리로 변경하여 서버 안정성 확보
+        for (const colName of collectionsToClear) {
             const snapshot = await getDocs(collection(db, colName));
             const docs = snapshot.docs;
             
-            const BATCH_SIZE = 400;
+            if (docs.length === 0) continue;
+
+            const BATCH_SIZE = 50; 
+            const totalBatches = Math.ceil(docs.length / BATCH_SIZE);
+            
             for (let i = 0; i < docs.length; i += BATCH_SIZE) {
                 const batch = writeBatch(db);
                 const chunk = docs.slice(i, i + BATCH_SIZE);
@@ -184,15 +193,17 @@ export const resetTournamentData = async () => {
 
                 let timerId;
                 const timeout = new Promise((_, reject) => {
-                    timerId = setTimeout(() => reject(new Error(`🧨 서버 초기화 지연 (60초 초과) [${colName}]`)), 60000);
+                    timerId = setTimeout(() => reject(new Error(`🧨 서버 초기화 지연 (120초 초과) [${colName}]`)), 120000);
                 });
 
                 await Promise.race([batch.commit(), timeout]);
                 clearTimeout(timerId);
+                
+                if (i + BATCH_SIZE < docs.length) {
+                    await new Promise(res => setTimeout(res, 300));
+                }
             }
-        });
-
-        await Promise.all(clearPromises);
+        }
         console.log("All data reset successfully!");
     } catch (error) {
         console.error("Error resetting data: ", error);
