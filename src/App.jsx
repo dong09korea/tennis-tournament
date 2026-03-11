@@ -11,7 +11,9 @@ import {
     isGroupMatch,
     generateBracket32,
     getTop32Teams,
-    FIXED_BRACKET_LAYOUT
+    FIXED_BRACKET_LAYOUT,
+    assignMatchesToCourts,
+    initBracket32Shell
 } from './utils/tournamentLogic';
 
 // Request notification permission on load
@@ -222,10 +224,10 @@ function App() {
                             console.log(`[AutoAssign Success] Firebase updated.`);
                         }
                     } catch (e) {
-                        document.title = 'ERR';
+                        document.title = 'ERR:' + (e.message || 'unknown').substring(0, 15);
                         console.error('[AutoAssign Error]', e);
                     }
-                }, 500); // reduced timeout to feel snappier
+                }, 1000); // 1초(1000ms)로 변경하여 안정성 확보
             }
 
             // ── Progressive 32-bracket slot filling ─────────────────────────
