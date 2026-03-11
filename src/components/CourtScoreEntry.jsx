@@ -135,7 +135,7 @@ const CourtScoreEntry = () => {
 
             setSubmitting(true);
             try {
-                await updateMatch(currentMatch.id, { score_a: numA, score_b: numB, status: 'COMPLETED', winner_id: winnerId });
+                await updateMatch(currentMatch.id, { score_a: numA, score_b: numB, status: 'COMPLETED', winner_id: winnerId, court_id: null });
                 await updateCourt(parseInt(courtId), { match_id: null }); // free the court
                 alert('✅ 결과가 등록되었습니다. 수고하셨습니다!');
                 navigate('/');
@@ -159,7 +159,7 @@ const CourtScoreEntry = () => {
             setSubmitting(true);
             try {
                 // Update the current match
-                const matchUpdates = { score_a: numA, score_b: numB, status: 'COMPLETED', winner_id: winnerId };
+                const matchUpdates = { score_a: numA, score_b: numB, status: 'COMPLETED', winner_id: winnerId, court_id: null };
                 await updateMatch(currentMatch.id, matchUpdates);
 
                 // Auto-advance logic
@@ -216,7 +216,8 @@ const CourtScoreEntry = () => {
                     tb_score_a: ta,
                     tb_score_b: tb,
                     status: 'COMPLETED',
-                    winner_id: winnerId
+                    winner_id: winnerId,
+                    court_id: null
                 };
                 await updateMatch(currentMatch.id, matchUpdates);
 

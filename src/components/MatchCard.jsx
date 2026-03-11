@@ -54,13 +54,14 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
     let newWinnerId = null;
 
     if (newStatus === 'COMPLETED') {
-      // Simple logic: higher score wins
-      const scoreA = match.score_a || 0;
-      const scoreB = match.score_b || 0;
-      if (scoreA > scoreB) newWinnerId = match.team_a_id;
-      else if (scoreB > scoreA) newWinnerId = match.team_b_id;
+        // Simple logic: higher score wins
+        const scoreA = match.score_a || 0;
+        const scoreB = match.score_b || 0;
+        if (scoreA > scoreB) newWinnerId = match.team_a_id;
+        else if (scoreB > scoreA) newWinnerId = match.team_b_id;
 
-      updates.winner_id = newWinnerId;
+        updates.winner_id = newWinnerId;
+        updates.court_id = null; // Important: The match must relinquish its grasp on the court ID.
 
       // Free the court if the match was assigned to one
       if (match.court_id) {
