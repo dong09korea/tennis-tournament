@@ -56,11 +56,11 @@ const KnockoutTree = ({ matches, teams, isAdmin, activeTabId }) => {
 
     const finals = getMatchesForRound('본선 결승', 1, 0);
 
-    const renderColumn = (matches, roundTitle, isLeft, isFinal = false) => (
+    const renderColumn = (columnMatches, roundTitle, isLeft, isFinal = false) => (
         <div className={`tree-column ${isLeft ? 'left-align' : 'right-align'} ${isFinal ? 'final-column' : ''}`}>
             <h4 className={`tree-round-header ${isFinal ? 'finals-header' : ''}`}>{roundTitle}</h4>
             <div className={`tree-match-list ${isFinal ? 'final-match' : ''}`}>
-                {matches.map((match, mIndex) => (
+                {columnMatches.map((match, mIndex) => (
                     <div key={match.id} className="tree-match-node">
                         <div className="tree-match-card-wrapper">
                             <MatchCard match={match} teamA={getTeam(match.team_a_id)} teamB={getTeam(match.team_b_id)} isAdmin={isAdmin} allMatches={matches} />
