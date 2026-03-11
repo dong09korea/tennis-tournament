@@ -514,7 +514,7 @@ export const initBracket32Shell = () => {
 
     return [
         ...matches32,
-        ...generateEmptyRound(8, 'ko16', '16강', 2000, 'ko8'),
+        ...generateEmptyRound(8, 'ko16', '본선 16강', 2000, 'ko8'),
         ...generateEmptyRound(4, 'ko8', '8강', 3000, 'ko4'),
         ...generateEmptyRound(2, 'ko4', '4강', 4000, 'final'),
         ...generateEmptyRound(1, 'final', '결승', 5000, null)

@@ -7,7 +7,11 @@ const KnockoutTree = ({ matches, teams, isAdmin, activeTabId }) => {
     // Get knockout matches 
     // Format assumption: match.id = "ko32_m1", "ko16_m1", etc.
     const getMatchesForRound = (roundId, count, offset = 0) => {
-        let roundMatches = matches.filter(m => m.group_id === roundId).sort((a, b) => {
+        let roundMatches = matches.filter(m => {
+            if (m.group_id === roundId) return true;
+            if (roundId === '본선 16강' && m.group_id === '16강') return true;
+            return false;
+        }).sort((a, b) => {
             const parseMatchNum = id => parseInt(String(id).match(/\d+$/)?.[0] || '0', 10);
             return parseMatchNum(a.id) - parseMatchNum(b.id);
         });
