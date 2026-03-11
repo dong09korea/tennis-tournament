@@ -131,7 +131,8 @@ function App() {
                             court: courtId,
                             teamA: teamA.name,
                             teamB: teamB.name,
-                            group: matchToNotify.group_id
+                            group: matchToNotify.group_id,
+                            round: matchToNotify.round
                         });
                         addNotifiedMatch(matchToNotify.id);
                     }
@@ -405,8 +406,9 @@ function App() {
 
         // Native browser/phone notification
         if ('Notification' in window && Notification.permission === 'granted') {
+            const roundText = info.round >= 1000 ? `${(info.round % 1000) + 1}번째` : `${info.round}번째`;
             const n = new Notification('🎾 코트 배정 알림', {
-                body: `[${info.group}] ${info.teamA} VS ${info.teamB}\n→ ${info.court}번 코트로 출전해주세요!`,
+                body: `[${info.group} ${roundText} 경기]\n${info.teamA} VS ${info.teamB}\n→ ${info.court}번 코트로 출전해주세요!`,
                 icon: '/tennis-icon.png',
                 vibrate: [300, 100, 300],
                 requireInteraction: true
@@ -429,8 +431,9 @@ function App() {
                     // Fallback to speech if audio file is blocked
                     if ('speechSynthesis' in window && info) {
                         const stageLabel = info.group || '';
+                        const roundText = info.round >= 1000 ? `${(info.round % 1000) + 1}번째` : `${info.round}번째`;
                         const msg = new SpeechSynthesisUtterance(
-                            `${stageLabel} ${info.teamA} 대 ${info.teamB}, ${info.court}번 코트로 출전해주세요.`
+                            `${stageLabel} ${roundText} 경기, ${info.teamA} 대 ${info.teamB}, ${info.court}번 코트로 출전해주세요.`
                         );
                         msg.lang = 'ko-KR';
                         window.speechSynthesis.speak(msg);
@@ -486,7 +489,8 @@ function App() {
                             {notifications.map((notif, idx) => (
                                 <div key={notif.id} className="notification-content pulse-animation">
                                     <h2>📢 다음 경기 배정 알림 {notifications.length > 1 ? `(${idx + 1}/${notifications.length})` : ''}</h2>
-                                    <p className="notification-teams">[{notif.group}] {notif.teamA} VS {notif.teamB}</p>
+                                    <p className="notification-teams">[{notif.group} {notif.round >= 1000 ? (notif.round % 1000) + 1 : notif.round}번째 경기]</p>
+                                    <p className="notification-teams" style={{ fontSize: '1.4rem', marginTop: '5px' }}>{notif.teamA} VS {notif.teamB}</p>
                                     <p className="notification-court">👉 <span>{notif.court}번 코트</span>로 출전 바랍니다!</p>
                                     <button onClick={() => dismissNotification(notif.id)} className="modern-button primary full-width mt-10">확인 (알람 종료)</button>
                                 </div>
