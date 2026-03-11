@@ -57,7 +57,7 @@ const KnockoutTree = ({ matches, teams, isAdmin, activeTabId }) => {
                 {matches.map((match, mIndex) => (
                     <div key={match.id} className="tree-match-node">
                         <div className="tree-match-card-wrapper">
-                            <MatchCard match={match} teamA={getTeam(match.team_a_id)} teamB={getTeam(match.team_b_id)} isAdmin={isAdmin} />
+                            <MatchCard match={match} teamA={getTeam(match.team_a_id)} teamB={getTeam(match.team_b_id)} isAdmin={isAdmin} allMatches={matches} />
                         </div>
                     </div>
                 ))}
@@ -152,7 +152,7 @@ const KnockoutTree = ({ matches, teams, isAdmin, activeTabId }) => {
                                 <div className="tree-match-list final-match">
                                     <div className="tree-match-node center-node">
                                         <div className="tree-match-card-wrapper">
-                                            <MatchCard match={finals[0]} teamA={getTeam(finals[0].team_a_id)} teamB={getTeam(finals[0].team_b_id)} isAdmin={isAdmin} />
+                                            <MatchCard match={finals[0]} teamA={getTeam(finals[0].team_a_id)} teamB={getTeam(finals[0].team_b_id)} isAdmin={isAdmin} allMatches={matches} />
                                         </div>
                                     </div>
                                 </div>
