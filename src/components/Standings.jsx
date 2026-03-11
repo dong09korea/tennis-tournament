@@ -147,8 +147,8 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
         <button className={`st-tab ${viewMode === 'group' ? 'active' : ''}`} onClick={() => setViewMode('group')}>
           조별 순위
         </button>
-        <button className={`st-tab ${viewMode === 'overall' ? 'active' : ''}`} onClick={() => setViewMode('overall')}>
-          전체 예선 순위
+        <button className={`st-tab ${viewMode === 'wildcard' ? 'active' : ''}`} onClick={() => setViewMode('wildcard')}>
+          와일드카드 순위
         </button>
       </div>
 
@@ -314,45 +314,68 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
               <span className="col-gd">득실차</span>
             </div>
           </div>
-          {overallStandings.map((team, index) => {
-            const wins = team.wins || 0;
-            const draws = team.draws || 0;
-            const losses = team.losses || 0;
-            const played = team.played || 0;
-            const gamesWon = team.gamesWon || 0;
-            const pts = team.pts || 0;
-            const goalDiff = team.goalDiff || 0;
+          {(() => {
+            // Extract all 3rd place teams from allTeams
+            const thirdPlacers = allTeams.filter(t => t.groupRank === 3);
+            
+            // Sort strictly by Wildcard tiebreakers: 1. Points, 2. Wins, 3. GoalDiff, 4. TiebreakAge/Age
+            thirdPlacers.sort((a, b) => {
+              if (b.pts !== a.pts) return b.pts - a.pts;
+              if (b.wins !== a.wins) return b.wins - a.wins;
+              if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
 
-            const isDirect = team.groupRank <= 2 && played > 0;
-            const isWild = wildcardIds.has(team.id);
-            const rowMod = isDirect ? 'row-direct' : isWild ? 'row-wild' : '';
+              const ageA = parseInt(a.tiebreakAge) || parseInt(a.age) || 0;
+              const ageB = parseInt(b.tiebreakAge) || parseInt(b.age) || 0;
+              if (ageB !== ageA) return ageB - ageA;
 
-            const parts = team.name ? team.name.split('/') : [team.name];
-            const p1 = parts[0] || '';
-            const p2 = parts[1] || '';
+              return (a.name || '').localeCompare(b.name || '');
+            });
 
-            return (
-              <div key={team.id} className={`sc-row ${rowMod}`}>
-                <div className="sc-rank" style={{ width: 44, textAlign: 'center' }}>{index + 1}</div>
-                <div className="sc-rank" style={{ width: 50, color: '#aaa' }}>
-                  {String(team.initial_group).endsWith('조') ? team.initial_group : `${team.initial_group}조`}
+            if (thirdPlacers.length === 0 && groupNames.length > 0) {
+              return <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>예선 경기가 진행되면 3위 팀들의 와일드카드 순위가 표시됩니다.</div>;
+            }
+
+            return thirdPlacers.map((team, index) => {
+              const wins = team.wins || 0;
+              const draws = team.draws || 0;
+              const losses = team.losses || 0;
+              const played = team.played || 0;
+              const pts = team.pts || 0;
+              const goalDiff = team.goalDiff || 0;
+
+              // Top 8 teams in this list are wildcard eligible
+              const isWild = index < 8 && played > 0;
+              const rowMod = isWild ? 'row-wild' : '';
+
+              const parts = team.name ? team.name.split('/') : [team.name];
+              const p1 = parts[0] || '';
+              const p2 = parts[1] || '';
+
+              return (
+                <div key={team.id} className={`sc-row ${rowMod}`}>
+                  <div className="sc-rank" style={{ width: 44, textAlign: 'center' }}>
+                    {index + 1}
+                  </div>
+                  <div className="sc-rank" style={{ width: 50, color: '#aaa' }}>
+                    {String(team.group_id || team.initial_group || '').replace('조', '')}조
+                  </div>
+                  <div className="sc-team">
+                    <div className="sc-name">{p1}</div>
+                    {p2 && <div className="sc-name2">{p2}</div>}
+                    {team.club && <div className="sc-club" style={{ color: getClubColor(team.club) }}>{team.club}</div>}
+                  </div>
+                  <div className="sc-stat">{played}</div>
+                  <div className="sc-stat col-pts" style={{ color: '#d5ff00', fontWeight: 700 }}>{pts}</div>
+                  <div className="sc-stat" style={{ color: wins > 0 ? '#a8e063' : '#666' }}>{wins}</div>
+                  <div className="sc-stat" style={{ color: draws > 0 ? '#88aaff' : '#666' }}>{draws}</div>
+                  <div className="sc-stat" style={{ color: losses > 0 ? '#ff7070' : '#666' }}>{losses}</div>
+                  <div className="sc-stat col-gd" style={{ color: goalDiff > 0 ? '#ff9b55' : (goalDiff < 0 ? '#ff5555' : '#888') }}>
+                    {goalDiff > 0 ? `+${goalDiff}` : goalDiff}
+                  </div>
                 </div>
-                <div className="sc-team">
-                  <div className="sc-name">{p1}</div>
-                  {p2 && <div className="sc-name2">{p2}</div>}
-                  {team.club && <div className="sc-club" style={{ color: getClubColor(team.club) }}>{team.club}</div>}
-                </div>
-                <div className="sc-stat">{played}</div>
-                <div className="sc-stat col-pts" style={{ color: '#d5ff00', fontWeight: 700 }}>{pts}</div>
-                <div className="sc-stat" style={{ color: wins > 0 ? '#a8e063' : '#666' }}>{wins}</div>
-                <div className="sc-stat" style={{ color: draws > 0 ? '#88aaff' : '#666' }}>{draws}</div>
-                <div className="sc-stat" style={{ color: losses > 0 ? '#ff7070' : '#666' }}>{losses}</div>
-                <div className="sc-stat col-gd" style={{ color: goalDiff > 0 ? '#ff9b55' : (goalDiff < 0 ? '#ff5555' : '#888') }}>
-                  {goalDiff > 0 ? `+${goalDiff}` : goalDiff}
-                </div>
-              </div>
-            );
-          })}
+              );
+            });
+          })()}
         </div>
       )}
 
