@@ -177,8 +177,7 @@ function App() {
                 const linkedMatch = newData.matches.find(m => m.id === c.match_id);
                 return !linkedMatch || linkedMatch.status !== 'LIVE';
             });
-            const hasPendingMatches = newData.matches.some(m => m.status === 'PENDING' && !m.court_id && m.team_a_id !== 'TBD' && m.team_b_id !== 'TBD' && m.team_a_id !== 'BYE' && m.team_b_id !== 'BYE');
-
+            const hasPendingMatches = newData.matches.some(m => m.status === 'PENDING' && !m.court_id);
             console.log(`[AutoAssign Watcher] hasEmptyCourts: ${hasEmptyCourts}, hasPendingMatches: ${hasPendingMatches}`);
 
             if (hasEmptyCourts && hasPendingMatches) {
