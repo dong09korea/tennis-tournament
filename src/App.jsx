@@ -677,35 +677,15 @@ function App() {
                 {/* ---- DEBUG OVERLAY ---- */}
                 <div style={{
                     position: 'fixed', bottom: '10px', left: '10px', zIndex: 10000,
-                    background: 'rgba(0,0,0,0.8)', color: '#0f0', padding: '10px',
-                    borderRadius: '5px', fontSize: '11px', fontFamily: 'monospace',
-                    pointerEvents: 'none', border: '1px solid #0f0'
-                }}>
-                    <div>Data: {data.matches.length} matches, {data.courts.length} courts</div>
-                    <div>Empty: {data.courts.some(c => c.match_id === null || !data.matches.find(m => m.id === c.match_id && m.status === 'LIVE')) ? 'YES' : 'NO'}</div>
-                    <div>Pending: {data.matches.some(m => m.status === 'PENDING' && !m.court_id) ? 'YES' : 'NO'}</div>
-                    <div>Wait, if YES YES... why no assign?</div>
-                </div>
-                {/* ---- DEBUG OVERLAY ---- */}
-                <div style={{
-                    position: 'fixed', bottom: '10px', left: '10px', zIndex: 10000,
                     background: 'rgba(0,0,0,0.85)', color: '#0f0', padding: '12px',
                     borderRadius: '5px', fontSize: '12px', fontFamily: 'monospace',
                     pointerEvents: 'none', border: '2px solid #0f0', whiteSpace: 'pre-wrap'
                 }}>
-                    <div>Data: {data.matches.length} matches, {data.courts.length} courts</div>
+                    <div>Data: {(data?.matches || []).length} matches, {(data?.courts || []).length} courts</div>
                     <div>Admin: {isAdmin ? 'YES' : 'NO'}</div>
-                    <div>Empty: {data.courts.some(c => c.match_id === null || !data.matches.find(m => m.id === c.match_id && m.status === 'LIVE')) ? 'YES' : 'NO'}</div>
-                    <div>Pending: {data.matches.some(m => m.status === 'PENDING' && !m.court_id) ? 'YES' : 'NO'}</div>
+                    <div>Empty: {(data?.courts || []).some(c => c.match_id === null || !(data?.matches || []).find(m => m.id === c.match_id && m.status === 'LIVE')) ? 'YES' : 'NO'}</div>
+                    <div>Pending: {(data?.matches || []).some(m => m.status === 'PENDING' && !m.court_id) ? 'YES' : 'NO'}</div>
                     <div style={{color: '#ff0', marginTop: '5px'}}>Status: {debugMsg}</div>
-                    <div style={{marginTop: '5px'}}>
-                        {(() => {
-                            if (!isAdmin) return "Admin required for auto-assign.";
-                            const testAssign = assignMatchesToCourts([...data.matches], [...data.courts]);
-                            const diff = testAssign.courts.filter(c => c.match_id !== data.courts.find(oc => oc.id === c.id)?.match_id);
-                            return `Alg would change ${diff.length} courts locally right now`;
-                        })()}
-                    </div>
                 </div>
             </Layout>
         </>
