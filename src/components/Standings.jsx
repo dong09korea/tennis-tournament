@@ -315,8 +315,8 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
             </div>
           </div>
           {(() => {
-            // Extract all 3rd place teams from allTeams
-            const thirdPlacers = allTeams.filter(t => t.groupRank === 3);
+            // Extract all 3rd place teams from overallStandings
+            const thirdPlacers = overallStandings.filter(t => t.groupRank === 3);
             
             // Sort strictly by Wildcard tiebreakers: 1. Points, 2. Wins, 3. GoalDiff, 4. TiebreakAge/Age
             thirdPlacers.sort((a, b) => {
