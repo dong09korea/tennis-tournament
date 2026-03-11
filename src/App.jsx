@@ -668,6 +668,18 @@ function App() {
                     to { opacity: 1; }
                 }
             `}</style>
+                {/* ---- DEBUG OVERLAY ---- */}
+                <div style={{
+                    position: 'fixed', bottom: '10px', left: '10px', zIndex: 10000,
+                    background: 'rgba(0,0,0,0.8)', color: '#0f0', padding: '10px',
+                    borderRadius: '5px', fontSize: '11px', fontFamily: 'monospace',
+                    pointerEvents: 'none', border: '1px solid #0f0'
+                }}>
+                    <div>Data: {data.matches.length} matches, {data.courts.length} courts</div>
+                    <div>Empty: {data.courts.some(c => c.match_id === null || !data.matches.find(m => m.id === c.match_id && m.status === 'LIVE')) ? 'YES' : 'NO'}</div>
+                    <div>Pending: {data.matches.some(m => m.status === 'PENDING' && !m.court_id) ? 'YES' : 'NO'}</div>
+                    <div>Wait, if YES YES... why no assign?</div>
+                </div>
             </Layout>
         </>
     );
