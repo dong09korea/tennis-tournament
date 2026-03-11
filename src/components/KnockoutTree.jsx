@@ -9,7 +9,9 @@ const KnockoutTree = ({ matches, teams, isAdmin, activeTabId }) => {
     const getMatchesForRound = (roundId, count, offset = 0) => {
         let roundMatches = matches.filter(m => {
             if (m.group_id === roundId) return true;
-            if (roundId === '본선 16강' && m.group_id === '16강') return true;
+            // Flexible matching for knockout round names
+            const normalize = (s) => String(s).replace('본선 ', '');
+            if (normalize(m.group_id) === normalize(roundId)) return true;
             return false;
         }).sort((a, b) => {
             const parseMatchNum = id => parseInt(String(id).match(/\d+$/)?.[0] || '0', 10);
@@ -43,16 +45,16 @@ const KnockoutTree = ({ matches, teams, isAdmin, activeTabId }) => {
     // Left side counts: 32강:8, 16강:4, 8강:2, 4강:1
     const leftR32 = getMatchesForRound('본선 32강', 8, 0);
     const leftR16 = getMatchesForRound('본선 16강', 4, 0);
-    const leftR8 = getMatchesForRound('8강', 2, 0);
-    const leftR4 = getMatchesForRound('4강', 1, 0);
+    const leftR8 = getMatchesForRound('본선 8강', 2, 0);
+    const leftR4 = getMatchesForRound('본선 4강', 1, 0);
 
     // Right side counts: 32강:8, 16강:4, 8강:2, 4강:1
     const rightR32 = getMatchesForRound('본선 32강', 8, 8);
     const rightR16 = getMatchesForRound('본선 16강', 4, 4);
-    const rightR8 = getMatchesForRound('8강', 2, 2);
-    const rightR4 = getMatchesForRound('4강', 1, 1);
+    const rightR8 = getMatchesForRound('본선 8강', 2, 2);
+    const rightR4 = getMatchesForRound('본선 4강', 1, 1);
 
-    const finals = getMatchesForRound('결승', 1, 0);
+    const finals = getMatchesForRound('본선 결승', 1, 0);
 
     const renderColumn = (matches, roundTitle, isLeft, isFinal = false) => (
         <div className={`tree-column ${isLeft ? 'left-align' : 'right-align'} ${isFinal ? 'final-column' : ''}`}>
@@ -81,15 +83,17 @@ const KnockoutTree = ({ matches, teams, isAdmin, activeTabId }) => {
     };
 
     const getFullRoundId = (shortId) => {
-        switch (shortId) {
+        switch (normalize(shortId)) {
             case '32강': return '본선 32강';
             case '16강': return '본선 16강';
-            case '8강': return '8강';
-            case '4강': return '4강';
-            case '결승': return '결승';
+            case '8강': return '본선 8강';
+            case '4강': return '본선 4강';
+            case '결승': return '본선 결승';
             default: return shortId;
         }
     }
+
+    const normalize = (s) => String(s).replace('본선 ', '');
 
     // If a specific tab is selected, render just that round
     const isSingleRound = activeTabId && activeTabId !== 'full_tree' && activeTabId !== 'all';

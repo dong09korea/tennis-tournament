@@ -515,9 +515,9 @@ export const initBracket32Shell = () => {
     return [
         ...matches32,
         ...generateEmptyRound(8, 'ko16', '본선 16강', 2000, 'ko8'),
-        ...generateEmptyRound(4, 'ko8', '8강', 3000, 'ko4'),
-        ...generateEmptyRound(2, 'ko4', '4강', 4000, 'final'),
-        ...generateEmptyRound(1, 'final', '결승', 5000, null)
+        ...generateEmptyRound(4, 'ko8', '본선 8강', 3000, 'ko4'),
+        ...generateEmptyRound(2, 'ko4', '본선 4강', 4000, 'final'),
+        ...generateEmptyRound(1, 'final', '본선 결승', 5000, null)
     ];
 };
 
@@ -698,10 +698,10 @@ export const generateBracket32 = (top32Teams, groupedStandings) => {
         return roundMatches;
     };
 
-    const matches16 = generateEmptyRound(16, "ko16", "16강", 30, "ko8");
-    const matches8 = generateEmptyRound(8, "ko8", "8강", 40, "ko4");
-    const matches4 = generateEmptyRound(4, "ko4", "4강", 50, "final");
-    const matchesFinal = generateEmptyRound(2, "final", "결승", 60, null);
+    const matches16 = generateEmptyRound(16, "ko16", "본선 16강", 2000, "ko8");
+    const matches8 = generateEmptyRound(8, "ko8", "본선 8강", 3000, "ko4");
+    const matches4 = generateEmptyRound(4, "ko4", "본선 4강", 4000, "final");
+    const matchesFinal = generateEmptyRound(2, "final", "본선 결승", 5000, null);
 
     return [...matches, ...matches16, ...matches8, ...matches4, ...matchesFinal];
 };
