@@ -357,9 +357,7 @@ function App() {
                             if (m.status === 'PENDING') {
                                 // Side A
                                 if (def.a.g === 'W') {
-                                    if (allGroupsDone && wildcardMap[idx]?.a && m.team_a_id !== wildcardMap[idx].a) {
-                                        m.team_a_id = wildcardMap[idx].a; changed = true;
-                                    }
+                                    // Manually controlled by Standings.jsx 'onPushWildcardsToBracket' button
                                 } else {
                                     const tid = rankMap[def.a.g]?.[def.a.rank];
                                     if (tid && m.team_a_id !== tid) {
@@ -369,9 +367,7 @@ function App() {
 
                                 // Side B
                                 if (def.b.g === 'W') {
-                                    if (allGroupsDone && wildcardMap[idx]?.b && m.team_b_id !== wildcardMap[idx].b) {
-                                        m.team_b_id = wildcardMap[idx].b; changed = true;
-                                    }
+                                    // Manually controlled by Standings.jsx 'onPushWildcardsToBracket' button
                                 } else {
                                     const tid = rankMap[def.b.g]?.[def.b.rank];
                                     if (tid && m.team_b_id !== tid) {
@@ -613,6 +609,43 @@ function App() {
                                     : t
                             );
                             await uploadData({ ...data, teams: updatedTeams });
+                        }}
+                        onPushWildcardsToBracket={async () => {
+                            const rawStandings = calculateStandings(data.teams, data.matches);
+                            const overallTop32 = getTop32Teams(rawStandings);
+                            const tempBracket = generateBracket32(overallTop32);
+                            const wMap = {};
+                            tempBracket.filter(m => m.group_id === '본선 32강').forEach((m, idx) => {
+                                wMap[idx] = { a: m.team_a_id, b: m.team_b_id };
+                            });
+
+                            let updatedMatches = [...data.matches];
+                            let changed = false;
+                            updatedMatches = updatedMatches.map(m => {
+                                if (m.group_id !== '본선 32강') return m;
+                                const idx = parseInt(m.id.replace('ko32_m', '')) - 1;
+                                const def = FIXED_BRACKET_LAYOUT[idx]?.[m.is_team_a_next ? 'a' : 'b']; // Wait, the mapping logic above is safe using W map?
+                                // To be 100% safe, just sync exactly W sides by definition:
+                                const curDef = FIXED_BRACKET_LAYOUT[idx];
+                                if (!curDef) return m;
+
+                                let newM = { ...m };
+                                if (curDef.a.g === 'W' && wMap[idx]?.a && newM.team_a_id !== wMap[idx].a) {
+                                    newM.team_a_id = wMap[idx].a; changed = true;
+                                }
+                                if (curDef.b.g === 'W' && wMap[idx]?.b && newM.team_b_id !== wMap[idx].b) {
+                                    newM.team_b_id = wMap[idx].b; changed = true;
+                                }
+                                return newM;
+                            });
+
+                            if (changed) {
+                                const { matches: assigned, courts: assignedCourts } = assignMatchesToCourts(updatedMatches, data.courts);
+                                await uploadData({ ...data, matches: assigned, courts: assignedCourts });
+                                alert('✅ 와일드카드 팀이 32강 본선 슬롯에 배치되었습니다!');
+                            } else {
+                                alert('ℹ️ 32강 와일드카드 슬롯이 이미 최신 상태거나 배치할 팀이 없습니다.');
+                            }
                         }}
                     />
                 </div>

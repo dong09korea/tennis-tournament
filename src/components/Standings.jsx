@@ -57,7 +57,7 @@ const getWildcardIds = (allSortedGroups, tiebreakAges) => {
   return new Set(thirdPlacers.slice(0, 8).map(t => t.id));
 };
 
-const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTiebreaker }) => {
+const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTiebreaker, onPushWildcardsToBracket }) => {
   // Helper to generate consistent colors based on club string
   const getClubColor = (clubName) => {
     if (!clubName) return '#888';
@@ -445,11 +445,28 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                       transition: 'all 0.2s'
                     }}
                   >
-                    {confirming ? '저장 중...' : (!allTiedAgesEntered ? '⚠️ 동점팀의 합산나이를 모두 입력해주세요' : '✅ 와일드카드 나이 순위 확정')}
+                    {confirming ? '저장 중...' : (!allTiedAgesEntered ? '⚠️ 동점팀의 합산나이를 모두 입력해주세요' : '✅ 동점팀 나이 순위 확정 (저장)')}
                   </button>
                 </div>
               );
             })()}
+
+            {/* Separate button: Push wildcards to 32 bracket */}
+            {isAdmin && allGroupMatchesDone && (
+              <div style={{ padding: '15px 12px', borderTop: '1px solid rgba(255,255,255,0.1)', marginTop: '5px' }}>
+                  <button
+                    onClick={() => onPushWildcardsToBracket && onPushWildcardsToBracket()}
+                    style={{
+                      width: '100%', padding: '14px', fontSize: '1rem', fontWeight: 800,
+                      background: 'linear-gradient(135deg, #1de9b6, #00bfa5)',
+                      color: '#000', border: 'none', borderRadius: '8px', cursor: 'pointer',
+                      boxShadow: '0 4px 15px rgba(29,233,182,0.4)', transition: 'all 0.2s'
+                    }}
+                  >
+                    🏆 와일드카드 32강 본선 진출 확정 (슬롯 배치)
+                  </button>
+              </div>
+            )}
             </>
           );
         })()}
