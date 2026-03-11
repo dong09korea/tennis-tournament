@@ -41,6 +41,7 @@ function App() {
     const [notifications, setNotifications] = useState([]);
     const prevMatchesRef = useRef([]);
     const assignDebounceRef = useRef(null);
+    const bracketFillDebounceRef = useRef(null);
     const alarmAudioRef = useRef(null);
     const latestDataRef = useRef({ teams: [], groups: [], matches: [], courts: [] });
     const adminRef = useRef(null);
@@ -258,8 +259,8 @@ function App() {
 
                 // Step 2: Fill slots for completed groups + all-done wildcard fill
                 if (bracketShellExists) {
-                    if (assignDebounceRef.current) clearTimeout(assignDebounceRef.current);
-                    assignDebounceRef.current = setTimeout(async () => {
+                    if (bracketFillDebounceRef.current) clearTimeout(bracketFillDebounceRef.current);
+                    bracketFillDebounceRef.current = setTimeout(async () => {
                         const fd = latestDataRef.current;
                         if (!fd || !fd.matches || !fd.teams) return;
 

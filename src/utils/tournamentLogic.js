@@ -495,7 +495,7 @@ export const initBracket32Shell = () => {
     const matches32 = FIXED_BRACKET_LAYOUT.map((def, idx) => ({
         id: `ko32_m${idx + 1}`,
         group_id: '본선 32강',
-        round: 10 + idx,
+        round: 1000 + idx, // Make sure knockout matches sort after all group matches (which are ~1-100)
         team_a_id: 'TBD',
         team_b_id: 'TBD',
         score_a: 0, score_b: 0,
@@ -508,10 +508,10 @@ export const initBracket32Shell = () => {
 
     return [
         ...matches32,
-        ...generateEmptyRound(8, 'ko16', '16강', 30, 'ko8'),
-        ...generateEmptyRound(4, 'ko8', '8강', 40, 'ko4'),
-        ...generateEmptyRound(2, 'ko4', '4강', 50, 'final'),
-        ...generateEmptyRound(1, 'final', '결승', 60, null)
+        ...generateEmptyRound(8, 'ko16', '16강', 2000, 'ko8'),
+        ...generateEmptyRound(4, 'ko8', '8강', 3000, 'ko4'),
+        ...generateEmptyRound(2, 'ko4', '4강', 4000, 'final'),
+        ...generateEmptyRound(1, 'final', '결승', 5000, null)
     ];
 };
 

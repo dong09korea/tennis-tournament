@@ -22,6 +22,8 @@ async function check() {
 
     const emptyCourts = courts.filter(c => c.match_id === null || !matches.find(m => m.id === c.match_id && m.status === 'LIVE'));
     console.log("Empty courts:", emptyCourts.map(c => c.id));
+    console.log("Current court assignments:");
+    courts.forEach(c => console.log(`- Court ${c.id}: ${c.match_id}`));
 
     let pendingMatches = matches.filter(m =>
         m.status === 'PENDING' &&
