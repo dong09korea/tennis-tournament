@@ -125,9 +125,17 @@ const CourtScoreEntry = () => {
             }
             // 5:5 = draw for group stage
             const isDraw = numA === 5 && numB === 5;
-            if (numA === numB && !isDraw) {
-                alert('동점일 경우 승패를 확실히 입력해주세요. (단, 5:5는 무승부)');
-                return;
+            if (!isDraw) {
+                const winnerScore = Math.max(numA, numB);
+                const loserScore = Math.min(numA, numB);
+                if (winnerScore !== 6) {
+                    alert('예선전 승리 팀의 점수는 반드시 6점이어야 합니다. (예: 6:0 ~ 6:4)');
+                    return;
+                }
+                if (loserScore > 4) {
+                    alert('6:5 점수는 없습니다 (5:5 무승부 처리). 패배 팀의 최대 점수는 4점입니다.');
+                    return;
+                }
             }
             const winnerId = isDraw ? null : (numA > numB ? teamA.id : teamB.id);
             const label = isDraw ? '5:5 무승부' : `[${numA > numB ? teamA.name : teamB.name}] 승`;
@@ -155,6 +163,17 @@ const CourtScoreEntry = () => {
 
         // Normal win (no tiebreak)
         if (numA !== numB) {
+            const winnerScore = Math.max(numA, numB);
+            const loserScore = Math.min(numA, numB);
+            if (winnerScore !== 6) {
+                alert('본선 경기에서 승리 팀의 점수는 반드시 6점이어야 합니다.');
+                return;
+            }
+            if (loserScore > 4) {
+                alert('6:5 점수는 없습니다. 5:5가 되면 타이브레이크에 점수를 입력해주세요.');
+                return;
+            }
+
             const winnerId = numA > numB ? teamA.id : teamB.id;
             if (!confirm(`[${teamA.name}] ${numA} : ${numB} [${teamB.name}]\n\n이 결과가 맞습니까?`)) return;
             setSubmitting(true);
