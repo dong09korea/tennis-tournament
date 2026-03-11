@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { generateGroups, generateSchedule, assignMatchesToCourts, calculateStandings, getTop32Teams, generateBracket32, updateTournamentProgression } from '../utils/tournamentLogic';
-import { uploadData, updateMatch, resetTournamentData } from '../services/firebase';
+import { uploadData, updateMatch, updateCourt, resetTournamentData } from '../services/firebase';
 import { QRCodeSVG } from 'qrcode.react';
 import * as XLSX from 'xlsx';
 import MatchCard from './MatchCard';
@@ -1055,6 +1055,40 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                         style={{ flex: 1, minWidth: '200px', backgroundColor: '#e91e63' }}
                                     >
                                         👑 2. 본선 32강 대진표 생성 (고정 대진표)
+                                    </button>
+
+                                    <button
+                                        className="modern-button"
+                                        onClick={async () => {
+                                            if (!data || !data.matches || !data.courts) return alert("데이터가 없습니다.");
+                                            setIsProcessing(true);
+                                            try {
+                                                const { matches: nextMatches, courts: nextCourts } = assignMatchesToCourts(data.matches, data.courts);
+                                                const changedCourts = nextCourts.filter(c => c.match_id !== data.courts.find(oc => oc.id === c.id)?.match_id);
+                                                const changedMatches = nextMatches.filter(m => {
+                                                    const oldM = data.matches.find(om => om.id === m.id);
+                                                    return oldM && (m.status !== oldM.status || m.court_id !== oldM.court_id);
+                                                });
+                                                
+                                                if (changedCourts.length === 0 && changedMatches.length === 0) {
+                                                    alert("배정할 대기 경기가 없거나 빈 코트가 없습니다.");
+                                                } else {
+                                                    const promises = [];
+                                                    changedCourts.forEach(c => promises.push(updateCourt(c.id, { match_id: c.match_id })));
+                                                    changedMatches.forEach(m => promises.push(updateMatch(m.id, { status: m.status, court_id: m.court_id })));
+                                                    await Promise.all(promises);
+                                                    alert(`${changedCourts.length}개 빈 코트에 강제 배정이 완료되었습니다!`);
+                                                }
+                                            } catch (e) {
+                                                console.error(e);
+                                                alert("배정 중 오류 발생: " + e.message);
+                                            }
+                                            setIsProcessing(false);
+                                        }}
+                                        disabled={isProcessing}
+                                        style={{ width: 'auto', backgroundColor: '#3498db' }}
+                                    >
+                                        ⚡ 빈 코트 강제 배정
                                     </button>
 
                                     <button

@@ -177,7 +177,9 @@ function App() {
                 const linkedMatch = newData.matches.find(m => m.id === c.match_id);
                 return !linkedMatch || linkedMatch.status !== 'LIVE';
             });
-            const hasPendingMatches = newData.matches.some(m => m.status === 'PENDING' && !m.court_id);
+            const hasPendingMatches = newData.matches.some(m => m.status === 'PENDING' && !m.court_id && m.team_a_id !== 'TBD' && m.team_b_id !== 'TBD' && m.team_a_id !== 'BYE' && m.team_b_id !== 'BYE');
+
+            console.log(`[AutoAssign Watcher] hasEmptyCourts: ${hasEmptyCourts}, hasPendingMatches: ${hasPendingMatches}`);
 
             if (hasEmptyCourts && hasPendingMatches) {
                 if (assignDebounceRef.current) clearTimeout(assignDebounceRef.current);
@@ -186,6 +188,7 @@ function App() {
                 const capturedData = { matches: [...newData.matches], courts: [...newData.courts] };
                 
                 assignDebounceRef.current = setTimeout(async () => {
+                    console.log(`[AutoAssign Timer Fired]`);
                     try {
                         const { matches: nextMatches, courts: nextCourts } = assignMatchesToCourts(capturedData.matches, capturedData.courts);
                         
@@ -196,8 +199,10 @@ function App() {
                             return oldM && (m.status !== oldM.status || m.court_id !== oldM.court_id);
                         });
 
+                        console.log(`[AutoAssign Check] Changed matches: ${changedMatches.length}, Changed courts: ${changedCourts.length}`);
+
                         if (changedCourts.length > 0 || changedMatches.length > 0) {
-                            console.log(`AutoAssign: Updating ${changedCourts.length} courts and ${changedMatches.length} matches.`);
+                            console.log(`[AutoAssign Executing] Updating ${changedCourts.length} courts and ${changedMatches.length} matches.`);
                             const promises = [];
                             
                             changedCourts.forEach(c => {
@@ -209,9 +214,10 @@ function App() {
                             });
 
                             await Promise.all(promises);
+                            console.log(`[AutoAssign Success] Firebase updated.`);
                         }
                     } catch (e) {
-                        console.error('Auto assign error', e);
+                        console.error('[AutoAssign Error]', e);
                     }
                 }, 500); // reduced timeout to feel snappier
             }
