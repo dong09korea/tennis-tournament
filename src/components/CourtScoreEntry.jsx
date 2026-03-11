@@ -135,8 +135,9 @@ const CourtScoreEntry = () => {
 
             setSubmitting(true);
             try {
+                // Only update the match. The court will be auto-healed/reassigned by App.jsx
+                // because App.jsx considers a court empty if its match is not 'LIVE'.
                 await updateMatch(currentMatch.id, { score_a: numA, score_b: numB, status: 'COMPLETED', winner_id: winnerId, court_id: null });
-                await updateCourt(parseInt(courtId), { match_id: null }); // free the court
                 alert('✅ 결과가 등록되었습니다. 수고하셨습니다!');
                 navigate('/');
             } catch (err) {
@@ -165,9 +166,18 @@ const CourtScoreEntry = () => {
                 // Auto-advance logic
                 const tempMatches = data.matches.map(m => m.id === currentMatch.id ? { ...m, ...matchUpdates } : m);
                 const nextMatches = updateTournamentProgression(tempMatches, currentMatch.id, winnerId);
-                await uploadData({ ...data, matches: nextMatches });
+                
+                // Only update the specific next match document to avoid full DB wipe via uploadData
+                if (JSON.stringify(tempMatches) !== JSON.stringify(nextMatches)) {
+                    const nextMatchObj = nextMatches.find(m => m.id === currentMatch.next_match_id);
+                    if (nextMatchObj) {
+                        await updateMatch(nextMatchObj.id, {
+                            team_a_id: nextMatchObj.team_a_id,
+                            team_b_id: nextMatchObj.team_b_id
+                        });
+                    }
+                }
 
-                await updateCourt(parseInt(courtId), { match_id: null }); // free the court
                 alert('✅ 결과가 등록되었습니다. 수고하셨습니다!');
                 navigate('/');
             } catch (err) {
@@ -224,9 +234,18 @@ const CourtScoreEntry = () => {
                 // Auto-advance logic
                 const tempMatches = data.matches.map(m => m.id === currentMatch.id ? { ...m, ...matchUpdates } : m);
                 const nextMatches = updateTournamentProgression(tempMatches, currentMatch.id, winnerId);
-                await uploadData({ ...data, matches: nextMatches });
+                
+                // Only update the specific next match directly to avoid full uploadData rewrite
+                if (JSON.stringify(tempMatches) !== JSON.stringify(nextMatches)) {
+                    const nextMatchObj = nextMatches.find(m => m.id === currentMatch.next_match_id);
+                    if (nextMatchObj) {
+                        await updateMatch(nextMatchObj.id, {
+                            team_a_id: nextMatchObj.team_a_id,
+                            team_b_id: nextMatchObj.team_b_id
+                        });
+                    }
+                }
 
-                await updateCourt(parseInt(courtId), { match_id: null }); // free the court
                 alert('✅ 타이브레이크 결과가 등록되었습니다. 수고하셨습니다!');
                 navigate('/');
             } catch (err) {
