@@ -12,10 +12,10 @@ export const generateGroups = (teams, numGroups = 8) => {
     }));
 
     // Distribute teams
-    // Priority 1: initial_group
-    // Priority 2: Fill groups evenly (Snake Draft style logic is mostly done in AdminDashboard, 
-    // but here we just ensure balanced filling if not provided)
-    teams.forEach((team, index) => {
+    // First, let's make sure the input teams are sorted by drawOrder
+    const sortedTeams = [...teams].sort((a, b) => (a.drawOrder ?? 9999) - (b.drawOrder ?? 9999));
+
+    sortedTeams.forEach((team, index) => {
         let targetGroupIndex = -1;
 
         if (team.initial_group) {
@@ -45,85 +45,101 @@ export const generateGroups = (teams, numGroups = 8) => {
 };
 
 // Generate Matches (Round Robin within groups)
-// Generate Matches (Round Robin within groups)
-// This version strictly interleaves by Match Index (mIdx) across ALL groups.
-// Sequence: G1-M1, G2-M1, G3-M1... G12-M1 -> G1-M2, G2-M2...
 export const generateSchedule = (groups) => {
-    let allMatchesPerGroup = [];
+    let allMatches = [];
+    let globalMatchId = 1;
 
-    // 1. Build simple match lists for each group
     groups.forEach(group => {
         const teamIds = group.team_ids;
         const n = teamIds.length;
         if (n < 2) return;
 
-        let matchesForThisGroup = [];
+        let matchesForGroup = [];
+
         if (n === 4) {
-            // Standard order for 4-team groups
             const schedule4 = [
-                { i: 0, j: 1 }, // Match 1
-                { i: 2, j: 3 }, // Match 2
-                { i: 0, j: 2 }, // Match 3
-                { i: 1, j: 3 }, // Match 4
-                { i: 0, j: 3 }, // Match 5
-                { i: 1, j: 2 }  // Match 6
+                { i: 0, j: 1, r: 1 }, // 1v2 (Match 1)
+                { i: 2, j: 3, r: 1 }, // 3v4 (Match 2)
+                { i: 0, j: 2, r: 2 }, // 1v3 (Match 3)
+                { i: 1, j: 3, r: 2 }, // 2v4 (Match 4)
+                { i: 1, j: 2, r: 3 }, // 2v3 (Match 5)
+                { i: 0, j: 3, r: 3 }  // 1v4 (Match 6)
             ];
-            schedule4.forEach((pair, idx) => {
-                matchesForThisGroup.push({
+
+            schedule4.forEach((match, idx) => {
+                matchesForGroup.push({
                     id: `g${group.id}_m${idx + 1}`,
                     group_id: group.id,
-                    match_in_group: idx + 1,
-                    team_a_id: teamIds[pair.i],
-                    team_b_id: teamIds[pair.j],
-                    status: "PENDING",
+                    match_in_group: idx + 1, // e.g., 1st match of the group, 2nd match...
+                    team_a_id: teamIds[match.i],
+                    team_b_id: teamIds[match.j],
                     score_a: 0,
                     score_b: 0,
+                    status: "PENDING",
                     court_id: null,
                     winner_id: null
                 });
             });
         } else {
-            // Fallback for non-4 groups
-            let mIdx = 1;
+            // General Round Robin permutation for non-4 groups
+            let matchIdx = 1;
             for (let i = 0; i < n; i++) {
                 for (let j = i + 1; j < n; j++) {
-                    matchesForThisGroup.push({
-                        id: `g${group.id}_m${mIdx}`,
+                    matchesForGroup.push({
+                        id: `g${group.id}_m${matchIdx}`,
                         group_id: group.id,
-                        match_in_group: mIdx,
+                        match_in_group: matchIdx,
                         team_a_id: teamIds[i],
                         team_b_id: teamIds[j],
-                        status: "PENDING",
                         score_a: 0,
                         score_b: 0,
+                        status: "PENDING",
                         court_id: null,
                         winner_id: null
                     });
-                    mIdx++;
+                    matchIdx++;
                 }
             }
         }
-        allMatchesPerGroup.push(matchesForThisGroup);
+        allMatches.push(matchesForGroup);
     });
 
-    // 2. Interleave across all groups (Match 1 of all groups, then Match 2...)
-    let interleaved = [];
-    const maxMatchesCount = Math.max(...allMatchesPerGroup.map(g => g.length), 0);
+    // Interleave matches across all groups
+    // The user wants: "각조 1경기 12조까지 하고 각조 2경기 12조까지 하고 이렇게 6경기까지 돌아가게"
+    // This means we group by `match_in_group` (the relative round within the group), 
+    // and then sort by `group_id` within that round.
+    
+    // First, let's flatten the array
+    let allMatchesFlattened = [];
+    allMatches.forEach(groupMatches => {
+        allMatchesFlattened.push(...groupMatches);
+    });
 
-    for (let m = 0; m < maxMatchesCount; m++) {
-        for (let g = 0; g < allMatchesPerGroup.length; g++) {
-            if (allMatchesPerGroup[g][m]) {
-                interleaved.push(allMatchesPerGroup[g][m]);
-            }
+    // Sort: primarily by match_in_group, secondarily by the numeric part of group_id
+    allMatchesFlattened.sort((a, b) => {
+        if (a.match_in_group !== b.match_in_group) {
+            return a.match_in_group - b.match_in_group;
         }
-    }
+        
+        // Extract numeric group IDs for sorting (e.g., if group.id is just a number)
+        const gidA = parseInt(String(a.group_id).replace(/[^0-9]/g, ''), 10) || a.group_id;
+        const gidB = parseInt(String(b.group_id).replace(/[^0-9]/g, ''), 10) || b.group_id;
+        
+        if (gidA !== gidB) {
+            return gidA - gidB;
+        }
+        return 0;
+    });
 
-    // 3. Assign the global 'round' (sequence) number
-    // This is used by assignMatchesToCourts and for UI display order.
-    return interleaved.map((match, index) => ({
-        ...match,
-        round: index + 1
-    }));
+    // Finalize match objects with absolute round number
+    const finalMatches = allMatchesFlattened.map((m, idx) => {
+        return {
+            ...m,
+            round: idx + 1 // Use 'round' as the absolute sequence number for the whole UI
+        };
+    });
+
+    return finalMatches;
 };
 
 
@@ -298,6 +314,13 @@ export const calculateStandings = (teams, matches) => {
 
     Object.keys(grouped).forEach(gName => {
         grouped[gName].sort((a, b) => {
+            // Priority 0: If no games have been played by both, strictly use drawOrder for initial seeding
+            if (a.played === 0 && b.played === 0) {
+                const doA = a.drawOrder ?? 9999;
+                const doB = b.drawOrder ?? 9999;
+                return doA - doB;
+            }
+
             if (b.pts !== a.pts) return b.pts - a.pts; // 1. 승점
             if (b.wins !== a.wins) return b.wins - a.wins; // 2. 승수
             if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff; // 3. 득실차

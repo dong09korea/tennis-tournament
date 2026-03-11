@@ -198,7 +198,10 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
             }
 
             // Generate Logic
-            const groups = generateGroups(teams, numGroups);
+            // Sort teams by drawOrder if it exists, so they are pushed into groups in correct rank order
+            const sortedTeams = [...teams].sort((a, b) => (a.drawOrder ?? 9999) - (b.drawOrder ?? 9999));
+
+            const groups = generateGroups(sortedTeams, numGroups);
             const matches = generateSchedule(groups);
             const courts = Array.from({ length: numCourts }, (_, i) => ({
                 id: i + 1,
@@ -815,12 +818,16 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
             }
         }
 
-        // Apply best found assignment
+        // Apply best found assignment. We need to guarantee that teams picked in earlier seeds 
+        // ALWAYS have a lower drawOrder than teams picked in later seeds.
+        // We can do this by using the current max drawOrder or a base offset.
         for (let i = 0; i < seedTeams.length; i++) {
             const team = seedTeams[i];
             const bestGIdx = bestAssignment[i];
             currentGroups[bestGIdx].push(team);
             newGrid[team.originalIdx].group = `${bestGIdx + 1}조`;
+            // Increment drawOrder globally so any team drawn in this bucket gets a higher number 
+            // than the previous bucket, but we also sequence them within the bucket so there are no ties.
             newGrid[team.originalIdx].drawOrder = ++drawOrderRef.current;
         }
 

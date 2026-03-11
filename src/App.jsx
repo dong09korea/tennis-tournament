@@ -195,7 +195,7 @@ function App() {
                     } catch (e) {
                         console.error('Auto assign error', e);
                     }
-                }, 100);
+                }, 1000);
             }
 
             // ── Progressive 32-bracket slot filling ─────────────────────────
@@ -230,7 +230,7 @@ function App() {
                         const shell = initBracket32Shell();
                         await uploadData({ ...fd, matches: [...fd.matches, ...shell] });
                         console.log('✅ 32강 브라켓 틀 생성 완료 (첫 번째 조 완료 시)');
-                    }, 100);
+                    }, 800);
                 }
 
                 // Step 2: Fill slots for completed groups + all-done wildcard fill
@@ -352,9 +352,9 @@ function App() {
                         if (changed) {
                             const { matches: assigned, courts: assignedCourts } = assignMatchesToCourts(updatedMatches, fd.courts);
                             await uploadData({ ...fd, matches: assigned, courts: assignedCourts });
-                            console.log('✅ 32강 슬롯 업데이트 및 코트 배정 완료');
+                            console.log('✅ 32강 슬롯 업데이트 완료');
                         }
-                    }, 100);
+                    }, 1200);
                 }
             }
 
