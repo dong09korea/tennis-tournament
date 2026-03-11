@@ -181,16 +181,20 @@ function App() {
 
             if (hasEmptyCourts && hasPendingMatches) {
                 if (assignDebounceRef.current) clearTimeout(assignDebounceRef.current);
+                
+                // Capture the current snapshot data in closure
+                const capturedData = { matches: [...newData.matches], courts: [...newData.courts] };
+                
                 assignDebounceRef.current = setTimeout(async () => {
                     try {
-                        const freshestData = latestDataRef.current;
-                        if (!freshestData || !freshestData.matches || !freshestData.courts) return;
-
-                        const { matches: nextMatches, courts: nextCourts } = assignMatchesToCourts(freshestData.matches, freshestData.courts);
+                        const { matches: nextMatches, courts: nextCourts } = assignMatchesToCourts(capturedData.matches, capturedData.courts);
                         
                         // Extract only the courts and matches that actually changed to save Firebase writes
-                        const changedCourts = nextCourts.filter((c, i) => c.match_id !== freshestData.courts[i]?.match_id);
-                        const changedMatches = nextMatches.filter((m, i) => m.status !== freshestData.matches[i]?.status || m.court_id !== freshestData.matches[i]?.court_id);
+                        const changedCourts = nextCourts.filter(c => c.match_id !== capturedData.courts.find(oc => oc.id === c.id)?.match_id);
+                        const changedMatches = nextMatches.filter(m => {
+                            const oldM = capturedData.matches.find(om => om.id === m.id);
+                            return oldM && (m.status !== oldM.status || m.court_id !== oldM.court_id);
+                        });
 
                         if (changedCourts.length > 0 || changedMatches.length > 0) {
                             console.log(`AutoAssign: Updating ${changedCourts.length} courts and ${changedMatches.length} matches.`);
@@ -209,7 +213,7 @@ function App() {
                     } catch (e) {
                         console.error('Auto assign error', e);
                     }
-                }, 1000);
+                }, 500); // reduced timeout to feel snappier
             }
 
             // ── Progressive 32-bracket slot filling ─────────────────────────
