@@ -221,7 +221,7 @@ function App() {
                         // document.title = 'ERR:' + (e.message || 'unknown').substring(0, 15);
                         console.error('[AutoAssign Error]', e);
                     }
-                }, 1000); // 1초(1000ms)로 변경하여 안정성 확보
+                }, 3000); // 3초 대기로 변경 (대진표 먼저 반영되고 나중에 코트 배정되는 느낌을 주기 위함)
             }
 
             // ── Progressive 32-bracket slot filling ─────────────────────────
@@ -368,9 +368,8 @@ function App() {
                         });
 
                         if (changed) {
-                            const { matches: assigned, courts: assignedCourts } = assignMatchesToCourts(updatedMatches, fd.courts);
-                            await uploadData({ ...fd, matches: assigned, courts: assignedCourts });
-                            console.log('✅ 32강 슬롯 업데이트 완료');
+                            await uploadData({ ...fd, matches: updatedMatches });
+                            console.log('✅ 32강 슬롯 업데이트 완료 (코트 배정은 잠시 후 자동 수행)');
                         }
                     }, 1200);
                 }
@@ -630,9 +629,8 @@ function App() {
                             });
 
                             if (changed) {
-                                const { matches: assigned, courts: assignedCourts } = assignMatchesToCourts(updatedMatches, data.courts);
-                                await uploadData({ ...data, matches: assigned, courts: assignedCourts });
-                                alert('✅ 와일드카드 팀이 32강 본선 슬롯에 배치되었습니다!');
+                                await uploadData({ ...data, matches: updatedMatches });
+                                alert('✅ 와일드카드 팀이 32강 본선 슬롯에 배치되었습니다! (잠시 후 코트에 자동 배정됩니다)');
                             } else {
                                 alert('ℹ️ 32강 와일드카드 슬롯이 이미 최신 상태거나 배치할 팀이 없습니다.');
                             }
