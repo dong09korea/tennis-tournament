@@ -100,12 +100,13 @@ export const uploadData = async (data) => {
             });
         }
 
-        // Add a timeout to prevent hanging. Increased to 30s for large bracket generations
-        const timeout = new Promise((_, reject) =>
-            setTimeout(() => reject(new Error("Request timed out (30s). Check your connection.")), 30000)
-        );
+        let timerId;
+        const timeout = new Promise((_, reject) => {
+            timerId = setTimeout(() => reject(new Error("Request timed out (30s). Check your connection.")), 30000);
+        });
 
         await Promise.race([batch.commit(), timeout]);
+        clearTimeout(timerId);
         console.log("Data uploaded successfully!");
     } catch (error) {
         console.error("Error uploading data: ", error);
