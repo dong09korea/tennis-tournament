@@ -335,9 +335,14 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
               return <div style={{ padding: '20px', textAlign: 'center', color: '#888' }}>예선 경기가 진행되면 3위 팀들의 와일드카드 순위가 표시됩니다.</div>;
             }
 
-            return thirdPlacers.map((team, index) => {
-              const wins = team.wins || 0;
-              const draws = team.draws || 0;
+            const tiedIds = getTiedTeamIds(thirdPlacers);
+            const allGroupMatchesDone = (matches || []).length > 0 && (matches || []).filter(m => m.group_id && String(m.group_id).includes('조')).every(m => m.status === 'COMPLETED');
+
+            return (
+              <>
+                {thirdPlacers.map((team, index) => {
+                  const wins = team.wins || 0;
+                  const draws = team.draws || 0;
               const losses = team.losses || 0;
               const played = team.played || 0;
               const pts = team.pts || 0;
@@ -363,6 +368,40 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                     <div className="sc-name">{p1}</div>
                     {p2 && <div className="sc-name2">{p2}</div>}
                     {team.club && <div className="sc-club" style={{ color: getClubColor(team.club) }}>{team.club}</div>}
+                    
+                    {/* Admin tiebreaker age input for Wildcards */}
+                    {isAdmin && tiedIds.has(team.id) && allGroupMatchesDone && (() => {
+                      const ageEntered = tiebreakAges[team.id] !== undefined;
+                      return (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '5px' }}>
+                          <span style={{
+                            fontSize: '0.68rem',
+                            color: ageEntered ? '#4caf50' : '#ff9b55',
+                            fontWeight: 700,
+                            whiteSpace: 'nowrap'
+                          }}>
+                            {ageEntered ? '✅ 나이순위 적용' : '🔥 동점 — 합산나이'}
+                          </span>
+                          <input
+                            type="number"
+                            placeholder="예: 140"
+                            value={tiebreakAges[team.id] ?? ''}
+                            onChange={e => handleAgeChange(team.id, e.target.value === '' ? undefined : Number(e.target.value))}
+                            style={{
+                              width: '72px',
+                              padding: '2px 6px',
+                              fontSize: '0.8rem',
+                              borderRadius: '4px',
+                              border: `1px solid ${ageEntered ? '#4caf50' : '#ff9b55'}`,
+                              background: ageEntered ? 'rgba(76,175,80,0.15)' : 'rgba(255,155,85,0.12)',
+                              color: '#fff',
+                              outline: 'none',
+                              transition: 'border 0.2s, background 0.2s'
+                            }}
+                          />
+                        </div>
+                      );
+                    })()}
                   </div>
                   <div className="sc-stat">{played}</div>
                   <div className="sc-stat col-pts" style={{ color: '#d5ff00', fontWeight: 700 }}>{pts}</div>
@@ -374,8 +413,46 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                   </div>
                 </div>
               );
-            });
-          })()}
+            })}
+                
+            {/* Confirm tiebreaker button for Wildcards */}
+            {isAdmin && allGroupMatchesDone && tiedIds.size > 0 && (() => {
+              const allTiedAgesEntered = [...tiedIds].every(id => tiebreakAges[id] !== undefined);
+              const tieAlreadyConfirmed = [...tiedIds].every(id => {
+                const t = thirdPlacers.find(t => t.id === id);
+                return t?.tiebreakAge !== undefined;
+              });
+
+              if (tieAlreadyConfirmed) {
+                return (
+                  <div style={{ padding: '12px', fontSize: '0.8rem', color: '#4caf50', textAlign: 'center', fontWeight: 'bold' }}>
+                    ✅ 와일드카드 나이 순위 확정 완료
+                  </div>
+                );
+              }
+
+              return (
+                <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(255,155,85,0.3)' }}>
+                  <button
+                    onClick={() => confirmTiebreaker(tiedIds, onConfirmTiebreaker)}
+                    disabled={confirming || !allTiedAgesEntered}
+                    style={{
+                      width: '100%', padding: '10px', fontSize: '0.85rem', fontWeight: 700,
+                      background: allTiedAgesEntered ? 'linear-gradient(135deg,#4caf50,#2e7d32)' : '#555',
+                      color: allTiedAgesEntered ? '#fff' : '#aaa',
+                      border: 'none', borderRadius: '6px',
+                      cursor: confirming ? 'wait' : (!allTiedAgesEntered ? 'not-allowed' : 'pointer'),
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    {confirming ? '저장 중...' : (!allTiedAgesEntered ? '⚠️ 동점팀의 합산나이를 모두 입력해주세요' : '✅ 와일드카드 나이 순위 확정')}
+                  </button>
+                </div>
+              );
+            })()}
+            </>
+          );
+        })()}
         </div>
       )}
 

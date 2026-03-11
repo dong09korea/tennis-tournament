@@ -367,8 +367,8 @@ export const getTop32Teams = (groupedStandings) => {
         if (b.wins !== a.wins) return b.wins - a.wins;
         if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
 
-        const ageA = parseInt(a.age) || 0;
-        const ageB = parseInt(b.age) || 0;
+        const ageA = parseInt(a.tiebreakAge) || parseInt(a.age) || 0;
+        const ageB = parseInt(b.tiebreakAge) || parseInt(b.age) || 0;
         if (ageB !== ageA) return ageB - ageA;
 
         return a.name.localeCompare(b.name);
