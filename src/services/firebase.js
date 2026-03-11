@@ -93,13 +93,20 @@ export const uploadData = async (data) => {
             });
         }
 
+        const totalOps = allOps.length;
+        if (totalOps === 0) {
+            console.log("No data to upload.");
+            return;
+        }
+
         const BATCH_SIZE = 400;
-        const totalBatches = Math.ceil(allOps.length / BATCH_SIZE);
+        const totalBatches = Math.ceil(totalOps / BATCH_SIZE);
+        console.log(`Uploading ${totalOps} operations in ${totalBatches} batches...`);
         
         for (let i = 0; i < totalBatches; i++) {
             const batch = writeBatch(db);
             const start = i * BATCH_SIZE;
-            const end = Math.min(start + BATCH_SIZE, allOps.length);
+            const end = Math.min(start + BATCH_SIZE, totalOps);
             
             for (let j = start; j < end; j++) {
                 batch.set(allOps[j].ref, allOps[j].data);
@@ -112,7 +119,7 @@ export const uploadData = async (data) => {
 
             await Promise.race([batch.commit(), timeout]);
             clearTimeout(timerId);
-            console.log(`Batch ${i+1}/${totalBatches} uploaded.`);
+            console.log(`[Firebase] Batch ${i + 1}/${totalBatches} complete.`);
         }
 
         console.log("Full upload successful!");

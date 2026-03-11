@@ -195,9 +195,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
             }
 
             // Generate Logic
-            // Sort teams by drawOrder if it exists, so they are pushed into groups in correct rank order
             const sortedTeams = [...teams].sort((a, b) => (a.drawOrder ?? 9999) - (b.drawOrder ?? 9999));
-
             const groups = generateGroups(sortedTeams, numGroups);
             const matches = generateSchedule(groups);
             const courts = Array.from({ length: numCourts }, (_, i) => ({
@@ -205,18 +203,21 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                 match_id: null
             }));
 
-            // Auto Assign
             const { matches: assignedMatches, courts: assignedCourts } = assignMatchesToCourts(matches, courts);
-
             const newData = { teams, groups, matches: assignedMatches, courts: assignedCourts };
 
-            await resetTournamentData(); // Clean out orphaned docs before rewriting
+            setStatusMsg(`🧹 1단계: 이전 데이터 정리 중...`);
+            await resetTournamentData(); 
+            
+            setStatusMsg(`📤 2단계: 새 대진표 업로드 중 (${newData.matches.length}경기)...`);
             await uploadData(newData);
-            setStatusMsg("✅ 대회 생성 및 업로드 완료!");
-            setTimeout(() => setStatusMsg(""), 3000);
+
+            setStatusMsg("✅ 성공! 대진표가 인터넷에 실시간 반영되었습니다.");
+            setTimeout(() => setStatusMsg(""), 5000);
         } catch (e) {
-            console.error(e);
-            setStatusMsg("❌ 오류: " + e.message);
+            console.error("발생한 구체적 에러:", e);
+            setStatusMsg(`❌ 오류 발생: ${e.message}`);
+            alert(`대진표 생성 중 문제가 발생했습니다:\n${e.message}\n\n도움말: 확인 버튼을 누르고 다시 한 번 시도해보세요.`);
         } finally {
             setIsProcessing(false);
         }
