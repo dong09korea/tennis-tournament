@@ -17,23 +17,30 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
   const winnerId = match.winner_id;
 
   const getRankLabel = (team, isTeamA) => {
-    if (!team || team.id === 'BYE' || team.id === 'TBD') return null;
-
+    // If it's a 32-강 match, we can show the designated seed even if it's still TBD
     if (match.id && match.id.startsWith('ko32_m')) {
       const matchNumMatch = match.id.match(/^ko32_m(\d+)$/);
       if (matchNumMatch) {
         const mIdx = parseInt(matchNumMatch[1], 10) - 1;
         if (FIXED_BRACKET_LAYOUT[mIdx]) {
           const def = isTeamA ? FIXED_BRACKET_LAYOUT[mIdx].a : FIXED_BRACKET_LAYOUT[mIdx].b;
-          if (def.g === 'W') {
-            const originGroup = team.initial_group ? String(team.initial_group).replace(/조/g, '') : '?';
-            const originRank = team.groupRank || '3';
-            return `${originGroup}조 ${originRank}위`;
+          
+          // If we have a real team, check if it's the wildcard slot
+          if (team && team.id !== 'TBD' && team.id !== 'BYE' && def.g === 'W') {
+             const originGroup = team.initial_group ? String(team.initial_group).replace(/조/g, '') : '?';
+             const originRank = team.groupRank || '3';
+             return `${originGroup}조 ${originRank}위`;
           }
-          return `${def.g}조 ${def.rank}위`;
+          
+          // Otherwise show the fixed definition (e.g. "1조 1위" or "9조 2위" or "3위(W)")
+          const groupLabel = def.g === 'W' ? '3' : def.g;
+          const rankLabel = def.g === 'W' ? '위(W)' : `${def.rank}위`;
+          return `${groupLabel}조 ${rankLabel}`;
         }
       }
     }
+
+    if (!team || team.id === 'BYE' || team.id === 'TBD') return null;
 
     if (team.groupRank && team.initial_group) {
       return `${String(team.initial_group).replace(/조/g, '')}조 ${team.groupRank}위`;
