@@ -368,7 +368,7 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                 buttonPlacementMap[lastId] = grp;
             });
 
-            const allGroupMatchesDone = (matches || []).length > 0 && (matches || []).filter(m => m.group_id && String(m.group_id).includes('조')).every(m => m.status === 'COMPLETED');
+            // Removed allGroupMatchesDone requirement for wildcard tiebreakers
 
             return (
               <>
@@ -403,7 +403,7 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                     {team.club && <div className="sc-club" style={{ color: getClubColor(team.club) }}>{team.club}</div>}
                     
                     {/* Admin tiebreaker age input for Wildcards */}
-                    {isAdmin && tiedIds.has(team.id) && allGroupMatchesDone && (() => {
+                    {isAdmin && tiedIds.has(team.id) && (() => {
                       const ageEntered = tiebreakAges[team.id] !== undefined;
                       return (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '5px' }}>
@@ -447,7 +447,22 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                 </div>
                 {(() => {
                   const tiedGroup = buttonPlacementMap[team.id];
-                  if (tiedGroup && isAdmin && allGroupMatchesDone) {
+                  if (tiedGroup && isAdmin) {
+                     // Check if all tied teams' groups are fully completed
+                     const tiedGroupsDone = tiedGroup.every(t => {
+                         const gn = String(t.group_id || t.initial_group || '').replace('조', '');
+                         const gm = (matches || []).filter(m => String(m.group_id).replace('조', '') === gn);
+                         return gm.length > 0 && gm.every(m => m.status === 'COMPLETED');
+                     });
+
+                     if (!tiedGroupsDone) {
+                         return (
+                             <div className="tied-group-action" style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', textAlign: 'center', fontSize: '0.8rem', color: '#ff9b55' }}>
+                                 ⏳ 해당 팀들의 모든 예선 경기가 종료되어야 나이순위 확정이 가능합니다.
+                             </div>
+                         );
+                     }
+
                      const groupIds = tiedGroup.map(t => t.id);
                      const allAgesEntered = groupIds.every(id => tiebreakAges[id] !== undefined);
                      const tieAlreadyConfirmed = groupIds.every(id => {

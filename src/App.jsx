@@ -5,7 +5,7 @@ import Standings from './components/Standings';
 import AdminDashboard from './components/AdminDashboardNew';
 import SplashScreen from './components/SplashScreen';
 
-import { subscribeToData, uploadData, updateCourt, updateMatch } from './services/firebase';
+import { subscribeToData, uploadData, updateCourt, updateMatch, updateTeam } from './services/firebase';
 import {
     calculateStandings,
     isGroupMatch,
@@ -250,7 +250,10 @@ function App() {
                         const fd = latestDataRef.current;
                         if (!fd || fd.matches.some(m => m.group_id === '본선 32강')) return;
                         const shell = initBracket32Shell();
-                        await uploadData({ ...fd, matches: [...fd.matches, ...shell] });
+                        
+                        // Targeted update: Only add the new shell matches
+                        const promises = shell.map(m => updateMatch(m.id, m));
+                        await Promise.all(promises);
                         console.log('✅ 32강 브라켓 틀 생성 완료 (첫 번째 조 완료 시)');
                     }, 800);
                 }
@@ -368,8 +371,21 @@ function App() {
                         });
 
                         if (changed) {
-                            await uploadData({ ...fd, matches: updatedMatches });
-                            console.log('✅ 32강 슬롯 업데이트 완료 (코트 배정은 잠시 후 자동 수행)');
+                            // Targeted update: Only update matches that actually changed
+                            const promises = [];
+                            updatedMatches.forEach(m => {
+                                const oldM = fd.matches.find(om => om.id === m.id);
+                                if (oldM && (m.team_a_id !== oldM.team_a_id || m.team_b_id !== oldM.team_b_id)) {
+                                    promises.push(updateMatch(m.id, { 
+                                        team_a_id: m.team_a_id, 
+                                        team_b_id: m.team_b_id 
+                                    }));
+                                }
+                            });
+                            if (promises.length > 0) {
+                                await Promise.all(promises);
+                                console.log(`✅ 32강 슬롯 ${promises.length}개 업데이트 완료`);
+                            }
                         }
                     }, 1200);
                 }
@@ -592,16 +608,55 @@ function App() {
                             }
                         }}
                         onConfirmTiebreaker={async (tiebreakAges) => {
-                            const updatedTeams = data.teams.map(t =>
-                                tiebreakAges[t.id] !== undefined
-                                    ? { ...t, tiebreakAge: Number(tiebreakAges[t.id]) }
-                                    : t
-                            );
-                            await uploadData({ ...data, teams: updatedTeams });
+                            const promises = [];
+                            Object.entries(tiebreakAges).forEach(([teamId, age]) => {
+                                promises.push(updateTeam(teamId, { tiebreakAge: Number(age) }));
+                            });
+                            if (promises.length > 0) {
+                                await Promise.all(promises);
+                                console.log(`✅ ${promises.length}개 팀의 합산나이 저장 완료`);
+                            }
                         }}
                         onPushWildcardsToBracket={async () => {
                             const rawStandings = calculateStandings(data.teams, data.matches);
                             const overallTop32 = getTop32Teams(rawStandings);
+
+                            const thirdPlacers = [];
+                            Object.values(rawStandings).forEach(gTeams => {
+                                if (gTeams.length > 2) thirdPlacers.push(gTeams[2]);
+                            });
+                            
+                            const unresolvedTies = new Set();
+                            const byStats = {};
+                            thirdPlacers.forEach(t => {
+                                const gn = String(t.group_id || t.initial_group || '').replace('조', '');
+                                const gm = data.matches.filter(m => String(m.group_id).replace('조', '') === gn);
+                                const isGroupFinished = gm.length > 0 && gm.every(m => m.status === 'COMPLETED');
+                                
+                                if (!isGroupFinished) {
+                                    unresolvedTies.add(t.id);
+                                } else {
+                                    const key = `${t.pts}_${t.wins}_${t.goalDiff}`;
+                                    if (!byStats[key]) byStats[key] = [];
+                                    byStats[key].push(t);
+                                }
+                            });
+                            
+                            Object.values(byStats).forEach(group => {
+                                if (group.length > 1) {
+                                    const anyMissing = group.some(t => t.tiebreakAge === undefined);
+                                    if (anyMissing) {
+                                        group.forEach(t => unresolvedTies.add(t.id));
+                                    } else {
+                                        const ages = group.map(t => t.tiebreakAge);
+                                        const uniqueAges = new Set(ages);
+                                        if (uniqueAges.size !== ages.length) {
+                                            group.forEach(t => unresolvedTies.add(t.id));
+                                        }
+                                    }
+                                }
+                            });
+
                             const tempBracket = generateBracket32(overallTop32);
                             const wMap = {};
                             tempBracket.filter(m => m.group_id === '본선 32강').forEach((m, idx) => {
@@ -613,26 +668,43 @@ function App() {
                             updatedMatches = updatedMatches.map(m => {
                                 if (m.group_id !== '본선 32강') return m;
                                 const idx = parseInt(m.id.replace('ko32_m', '')) - 1;
-                                const def = FIXED_BRACKET_LAYOUT[idx]?.[m.is_team_a_next ? 'a' : 'b']; // Wait, the mapping logic above is safe using W map?
-                                // To be 100% safe, just sync exactly W sides by definition:
                                 const curDef = FIXED_BRACKET_LAYOUT[idx];
                                 if (!curDef) return m;
 
                                 let newM = { ...m };
-                                if (curDef.a.g === 'W' && wMap[idx]?.a && newM.team_a_id !== wMap[idx].a) {
-                                    newM.team_a_id = wMap[idx].a; changed = true;
-                                }
-                                if (curDef.b.g === 'W' && wMap[idx]?.b && newM.team_b_id !== wMap[idx].b) {
-                                    newM.team_b_id = wMap[idx].b; changed = true;
-                                }
+                                
+                                const syncSide = (side, wTeamId) => {
+                                    if (wTeamId && wTeamId !== 'TBD' && wTeamId !== 'BYE' && !unresolvedTies.has(wTeamId)) {
+                                        if (newM[side] !== wTeamId) { newM[side] = wTeamId; changed = true; }
+                                    } else {
+                                        if (newM[side] !== 'TBD') { newM[side] = 'TBD'; changed = true; }
+                                    }
+                                };
+
+                                if (curDef.a.g === 'W') syncSide('team_a_id', wMap[idx]?.a);
+                                if (curDef.b.g === 'W') syncSide('team_b_id', wMap[idx]?.b);
+                                
                                 return newM;
                             });
 
                             if (changed) {
-                                await uploadData({ ...data, matches: updatedMatches });
-                                alert('✅ 와일드카드 팀이 32강 본선 슬롯에 배치되었습니다! (잠시 후 코트에 자동 배정됩니다)');
+                                // Targeted update: Only update matches that actually changed
+                                const promises = [];
+                                updatedMatches.forEach(m => {
+                                    const oldM = data.matches.find(om => om.id === m.id);
+                                    if (oldM && (m.team_a_id !== oldM.team_a_id || m.team_b_id !== oldM.team_b_id)) {
+                                        promises.push(updateMatch(m.id, { 
+                                            team_a_id: m.team_a_id, 
+                                            team_b_id: m.team_b_id 
+                                        }));
+                                    }
+                                });
+                                if (promises.length > 0) {
+                                    await Promise.all(promises);
+                                    alert(`✅ 확정된 와일드카드 팀(${promises.length}개)이 대진표에 배치되었습니다!`);
+                                }
                             } else {
-                                alert('ℹ️ 32강 와일드카드 슬롯이 이미 최신 상태거나 배치할 팀이 없습니다.');
+                                alert('ℹ️ 추가로 배치할 확정 와일드카드 팀이 없습니다.');
                             }
                         }}
                     />

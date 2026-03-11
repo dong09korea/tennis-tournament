@@ -132,8 +132,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                 p1_name: '',
                 p1_gender: '',
                 p2_name: '',
-                p2_gender: '',
-                age: ''
+                p2_gender: ''
             }));
 
             // Start from row 1 (index 1) if header exists.
@@ -147,7 +146,6 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                     p1_name: row[1] || '',
                     p2_name: row[2] || '',
                     club: row[3] || '',
-                    age: row[4] || '', // Assuming age is in the 5th column if provided
                     group: ''
                 };
             }
@@ -185,7 +183,6 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                 club: r.club,
                 p1_gender: r.p1_gender,
                 p2_gender: r.p2_gender,
-                age: r.age,
                 drawOrder: r.drawOrder ?? 9999,
                 initial_group: r.group // Use manual group
             }));
@@ -913,8 +910,11 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
         <div className="dashboard-container">
             <div className="dashboard-header">
                 <h2><span className="icon-gap">⚙️</span> 대회 운영 대시보드</h2>
-                <div className="status-badge">
+                <div className="status-badge" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     {isProcessing ? "🔄 처리 중..." : "✅ 시스템 준비됨"}
+                    <span style={{ fontSize: '0.8rem', color: '#ff9800', cursor: 'pointer', textDecoration: 'underline' }} onClick={() => window.location.reload(true)}>
+                        (오류 지속 시 클릭하여 강제 새로고침)
+                    </span>
                 </div>
             </div>
 
@@ -1010,6 +1010,25 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                             📤 엑셀 업로드
                                             <input type="file" accept=".xlsx, .xls" onChange={handleExcelUpload} style={{ display: 'none' }} />
                                         </label>
+                                        <button 
+                                            onClick={async () => {
+                                                if (confirm("🚨 경고: 서버의 모든 대회 데이터를 '강제'로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며, 통신 오류를 해결하기 위해 사용합니다.")) {
+                                                    setIsProcessing(true);
+                                                    try {
+                                                        await resetTournamentData();
+                                                        alert("🧹 서버 데이터가 깨끗하게 비워졌습니다. 이제 다시 생성해보세요.");
+                                                        window.location.reload(); // Force reload to be sure
+                                                    } catch (e) {
+                                                        alert("초기화 실패: " + e.message);
+                                                    }
+                                                    setIsProcessing(false);
+                                                }
+                                            }}
+                                            className="mini-btn danger"
+                                            style={{ marginLeft: '10px' }}
+                                        >
+                                            ☢️ 서버 강제 초기화
+                                        </button>
                                     </div>
                                 </div>
 
@@ -1020,7 +1039,6 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                         <div className="gh-cell w-name">참가자A</div>
                                         <div className="gh-cell w-name">참가자B</div>
                                         <div className="gh-cell w-club">클럽</div>
-                                        <div className="gh-cell w-group">합산나이</div>
                                     </div>
                                     <div className="grid-body">
                                         {gridData.map((row, idx) => (
@@ -1030,7 +1048,6 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                 <input type="text" className="gc-input w-name" placeholder="참가자A" value={row.p1_name} onChange={(e) => handleGridChange(idx, 'p1_name', e.target.value)} />
                                                 <input type="text" className="gc-input w-name" placeholder="참가자B" value={row.p2_name} onChange={(e) => handleGridChange(idx, 'p2_name', e.target.value)} />
                                                 <input type="text" className="gc-input w-club" placeholder="클럽" value={row.club} onChange={(e) => handleGridChange(idx, 'club', e.target.value)} />
-                                                <input type="number" className="gc-input w-group" placeholder="나이" value={row.age} onChange={(e) => handleGridChange(idx, 'age', e.target.value)} />
                                             </div>
                                         ))}
                                     </div>
@@ -1225,8 +1242,58 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                             padding: '1rem',
                                             marginBottom: '1.2rem'
                                         }}>
-                                            <div style={{ color: '#ff9800', fontWeight: 700, marginBottom: '0.7rem', fontSize: '0.9rem' }}>
-                                                🧪 시뮬레이션 — 코트별 경기 종료
+                                            <div style={{ color: '#ff9800', fontWeight: 700, marginBottom: '0.7rem', fontSize: '0.9rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                                <span>🧪 시뮬레이션 — 간편 테스트 도구</span>
+                                                <button 
+                                                    onClick={async () => {
+                                                        if (!confirm("모든 예선 경기를 랜덤 점수로 즉시 종료하시겠습니까?")) return;
+                                                        setIsProcessing(true);
+                                                        try {
+                                                            const groupMatches = data.matches.filter(m => {
+                                                                const gid = String(m.group_id);
+                                                                return (typeof m.group_id === 'number' || gid.includes('조')) && m.status !== 'COMPLETED';
+                                                            });
+                                                            
+                                                            if (groupMatches.length === 0) {
+                                                                alert("종료할 예선 경기가 없습니다.");
+                                                                return;
+                                                            }
+
+                                                            const promises = [];
+                                                            groupMatches.forEach(m => {
+                                                                const winner = Math.random() > 0.5 ? 'a' : 'b';
+                                                                const loserScore = Math.floor(Math.random() * 5); // 0~4
+                                                                promises.push(updateMatch(m.id, {
+                                                                    status: 'COMPLETED',
+                                                                    score_a: winner === 'a' ? 6 : loserScore,
+                                                                    score_b: winner === 'b' ? 6 : loserScore,
+                                                                    winner_id: winner === 'a' ? m.team_a_id : m.team_b_id,
+                                                                    court_id: null
+                                                                }));
+                                                            });
+                                                            
+                                                            // Free any courts tied to these matches
+                                                            data.courts.forEach(c => {
+                                                                if (groupMatches.some(m => m.id === c.match_id)) {
+                                                                    promises.push(updateCourt(c.id, { match_id: null }));
+                                                                }
+                                                            });
+
+                                                            await Promise.all(promises);
+                                                            alert(`✅ ${groupMatches.length}개의 예선 경기가 자동 종료되었습니다.`);
+                                                        } catch (e) {
+                                                            alert("시뮬레이션 중 오류 발생: " + e.message);
+                                                        }
+                                                        setIsProcessing(false);
+                                                    }}
+                                                    style={{ 
+                                                        background: '#ff9800', border: 'none', color: 'black', 
+                                                        padding: '4px 10px', borderRadius: '6px', fontSize: '0.75rem', 
+                                                        fontWeight: 800, cursor: 'pointer' 
+                                                    }}
+                                                >
+                                                    ⏩ 모든 예선 경기 즉시 종료 (6:0 랜덤)
+                                                </button>
                                             </div>
                                             <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
                                                 {data.courts

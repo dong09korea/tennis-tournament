@@ -76,38 +76,46 @@ export const uploadData = async (data) => {
     try {
         console.log("Starting upload...");
         const cleanData = JSON.parse(JSON.stringify(data));
-        const batch = writeBatch(db);
-
+        
+        const allOps = [];
         cleanData.teams.forEach(team => {
-            const ref = doc(db, COLLECTIONS.TEAMS, team.id);
-            batch.set(ref, team);
+            allOps.push({ ref: doc(db, COLLECTIONS.TEAMS, team.id), data: team });
         });
-
         cleanData.groups.forEach(group => {
-            const ref = doc(db, COLLECTIONS.GROUPS, String(group.id));
-            batch.set(ref, group);
+            allOps.push({ ref: doc(db, COLLECTIONS.GROUPS, String(group.id)), data: group });
         });
-
         cleanData.matches.forEach(match => {
-            const ref = doc(db, COLLECTIONS.MATCHES, match.id);
-            batch.set(ref, match);
+            allOps.push({ ref: doc(db, COLLECTIONS.MATCHES, match.id), data: match });
         });
-
         if (cleanData.courts) {
             cleanData.courts.forEach(court => {
-                const ref = doc(db, COLLECTIONS.COURTS, String(court.id));
-                batch.set(ref, court);
+                allOps.push({ ref: doc(db, COLLECTIONS.COURTS, String(court.id)), data: court });
             });
         }
 
-        let timerId;
-        const timeout = new Promise((_, reject) => {
-            timerId = setTimeout(() => reject(new Error("Request timed out (30s). Check your connection.")), 30000);
-        });
+        const BATCH_SIZE = 400;
+        const totalBatches = Math.ceil(allOps.length / BATCH_SIZE);
+        
+        for (let i = 0; i < totalBatches; i++) {
+            const batch = writeBatch(db);
+            const start = i * BATCH_SIZE;
+            const end = Math.min(start + BATCH_SIZE, allOps.length);
+            
+            for (let j = start; j < end; j++) {
+                batch.set(allOps[j].ref, allOps[j].data);
+            }
 
-        await Promise.race([batch.commit(), timeout]);
-        clearTimeout(timerId);
-        console.log("Data uploaded successfully!");
+            let timerId;
+            const timeout = new Promise((_, reject) => {
+                timerId = setTimeout(() => reject(new Error(`🔥 서버 저장속도가 너무 느립니다 (60초 초과).`)), 60000);
+            });
+
+            await Promise.race([batch.commit(), timeout]);
+            clearTimeout(timerId);
+            console.log(`Batch ${i+1}/${totalBatches} uploaded.`);
+        }
+
+        console.log("Full upload successful!");
     } catch (error) {
         console.error("Error uploading data: ", error);
         throw error;
@@ -134,27 +142,50 @@ export const updateCourt = async (courtId, updates) => {
     }
 };
 
+export const updateTeam = async (teamId, updates) => {
+    try {
+        const teamRef = doc(db, COLLECTIONS.TEAMS, teamId);
+        await setDoc(teamRef, updates, { merge: true });
+    } catch (error) {
+        console.error("Error updating team: ", error);
+        throw error;
+    }
+};
+
 export const resetTournamentData = async () => {
     try {
         console.log("Starting full reset...");
-        // Clear local notification persistence so new tournaments can ring alarms
         localStorage.removeItem('notifiedMatchesList');
 
-        const batch = writeBatch(db);
+        const collectionsToClear = [
+            COLLECTIONS.MATCHES,
+            COLLECTIONS.TEAMS,
+            COLLECTIONS.GROUPS,
+            COLLECTIONS.COURTS
+        ];
 
-        // 1. Get all documents
-        const matchesSnapshot = await getDocs(collection(db, COLLECTIONS.MATCHES));
-        const teamsSnapshot = await getDocs(collection(db, COLLECTIONS.TEAMS));
-        const groupsSnapshot = await getDocs(collection(db, COLLECTIONS.GROUPS));
-        const courtsSnapshot = await getDocs(collection(db, COLLECTIONS.COURTS));
+        // Parallelize clearing across different collections
+        const clearPromises = collectionsToClear.map(async (colName) => {
+            const snapshot = await getDocs(collection(db, colName));
+            const docs = snapshot.docs;
+            
+            const BATCH_SIZE = 400;
+            for (let i = 0; i < docs.length; i += BATCH_SIZE) {
+                const batch = writeBatch(db);
+                const chunk = docs.slice(i, i + BATCH_SIZE);
+                chunk.forEach(d => batch.delete(d.ref));
 
-        // 2. Delete all
-        matchesSnapshot.forEach((doc) => { batch.delete(doc.ref); });
-        teamsSnapshot.forEach((doc) => { batch.delete(doc.ref); });
-        groupsSnapshot.forEach((doc) => { batch.delete(doc.ref); });
-        courtsSnapshot.forEach((doc) => { batch.delete(doc.ref); });
+                let timerId;
+                const timeout = new Promise((_, reject) => {
+                    timerId = setTimeout(() => reject(new Error(`🧨 서버 초기화 지연 (60초 초과) [${colName}]`)), 60000);
+                });
 
-        await batch.commit();
+                await Promise.race([batch.commit(), timeout]);
+                clearTimeout(timerId);
+            }
+        });
+
+        await Promise.all(clearPromises);
         console.log("All data reset successfully!");
     } catch (error) {
         console.error("Error resetting data: ", error);
