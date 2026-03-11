@@ -17,11 +17,8 @@ import {
 } from './utils/tournamentLogic';
 
 // Request notification permission on load
-const requestNotifPermission = async () => {
-    if ('Notification' in window && Notification.permission === 'default') {
-        await Notification.requestPermission();
-    }
-};
+// Removed requestNotifPermission on load as modern browsers require a user gesture (like a button click) to request notification permissions.
+// The user should use the explicit button in the UI to enable notifications.
 
 // Register service worker
 const registerSW = async () => {
@@ -70,10 +67,9 @@ function App() {
         }
     };
 
-    // Register SW + request notification permission once
+    // Register SW
     useEffect(() => {
         registerSW();
-        requestNotifPermission();
     }, []);
 
     // Persist state changes
@@ -500,7 +496,7 @@ function App() {
                 {/* Operator Mode - Always visible */}
                 {/* Operator Mode - Moved to AdminDashboard */}
                 {/* 🔔 알람 활성화 버튼: mobile browsers block audio without user interaction */}
-                {!audioUnlocked && !isAdmin && (
+                {!audioUnlocked && (
                     <div style={{
                         position: 'fixed', bottom: '80px', left: '50%', transform: 'translateX(-50%)',
                         zIndex: 9999, textAlign: 'center'
