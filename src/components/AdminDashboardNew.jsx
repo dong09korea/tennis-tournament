@@ -1502,33 +1502,46 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                         margin: 0; 
                     }
                     
-                    /* Hide everything except the QR tab content */
-                    body * {
-                        visibility: hidden !important;
-                    }
-                    
-                    .tab-content, .tab-content * {
-                        visibility: visible !important;
-                    }
-
-                    .tab-content {
-                        position: absolute !important;
-                        left: 0 !important;
-                        top: 0 !important;
-                        width: 100% !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        background: white !important;
+                    /* Reset body and root to block to prevent flexbox from breaking print pagination */
+                    body, #root {
                         display: block !important;
-                        visibility: visible !important;
+                        height: auto !important;
+                        min-height: auto !important;
+                        overflow: visible !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        background: white !important;
                     }
 
-                    /* Hide interactive/nested elements inside tab-content */
-                    .card-header, .card-desc, button, .status-badge, .dashboard-header, .tab-navigation {
+                    /* Hide all UI elements we don't want to print */
+                    .dashboard-header, 
+                    .tab-navigation, 
+                    .card-header, 
+                    .card-desc, 
+                    .right-col, 
+                    button, 
+                    .status-badge,
+                    .status-message {
                         display: none !important;
                     }
 
-                    /* Unset grid/flex for print and allow block flow */
+                    /* Reset the layout containers to standard block flow */
+                    .dashboard-container, 
+                    .dashboard-grid, 
+                    .left-col, 
+                    .tab-content,
+                    .glass-card {
+                        display: block !important;
+                        width: 100% !important;
+                        height: auto !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: white !important;
+                        border: none !important;
+                        box-shadow: none !important;
+                        overflow: visible !important;
+                    }
+
                     .qr-grid {
                         display: block !important;
                         width: 100% !important;
@@ -1536,7 +1549,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                         padding: 0 !important;
                     }
 
-                    /* Container for the Main QR (Target specific div by structure if needed) */
+                    /* Unset the flex parent container of the main QR to prevent issues */
                     div[style*="marginBottom: 2.5rem"] {
                         margin: 0 !important;
                         padding: 0 !important;
@@ -1545,7 +1558,6 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                     }
 
                     .qr-card {
-                        visibility: visible !important;
                         display: flex !important;
                         flex-direction: column !important;
                         align-items: center !important;
@@ -1581,7 +1593,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                     }
 
                     .qr-wrapper svg {
-                        width: 140mm !important; /* Scaled for A4 visibility */
+                        width: 140mm !important;
                         height: 140mm !important;
                     }
 
