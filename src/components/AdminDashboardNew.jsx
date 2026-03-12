@@ -1198,7 +1198,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                         {activeTab === 'qrcode' && (
                             <div className="tab-content fade-in">
                                 <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <h3><span className="icon-gap">📱</span> 코트별 점수 입력 QR 코드 ({numCourts}개)</h3>
+                                    <h3><span className="icon-gap">📱</span> 모바일 접속 QR & 코트별 점수 입력 ({numCourts}개)</h3>
                                     <button
                                         className="modern-button primary"
                                         style={{ padding: '0.5rem 1rem', fontSize: '0.9rem' }}
@@ -1207,7 +1207,18 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                         🖨️ 인쇄하기
                                     </button>
                                 </div>
-                                <p className="card-desc">아래의 QR 코드를 인쇄하여 각 코트에 부착하세요. 승리팀이 스마트폰으로 스캔하여 점수를 즉시 등록할 수 있습니다.</p>
+                                <p className="card-desc">아래의 접속용 QR코드 및 코트별 점수 입력 QR코드를 인쇄하여 현장에 배치하세요.</p>
+
+                                <div style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
+                                    <h4 style={{ color: 'var(--tennis-yellow)', marginBottom: '15px', fontSize: '1.2rem' }}>🌐 모바일 접속용 전체 QR 출입증 (Racket Up)</h4>
+                                    <div className="qr-card" style={{ display: 'inline-block', maxWidth: '350px', background: 'rgba(213,255,0,0.05)', borderColor: 'var(--tennis-yellow)' }}>
+                                        <div className="qr-wrapper" style={{ padding: '15px', background: 'white' }}>
+                                            <QRCodeSVG value="https://racketup.vercel.app/" size={200} level={"H"} />
+                                        </div>
+                                        <p className="qr-url" style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--tennis-yellow)', marginTop: '10px' }}>https://racketup.vercel.app/</p>
+                                        <p style={{ color: '#aaa', fontSize: '0.85rem', marginTop: '10px', marginBottom: '10px' }}>스마트폰 카메라로 스캔하여 사이트에 접속하세요!</p>
+                                    </div>
+                                </div>
 
                                 <div className="qr-grid">
                                     {Array.from({ length: numCourts }).map((_, i) => {
