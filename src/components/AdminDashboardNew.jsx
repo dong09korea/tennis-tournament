@@ -1512,7 +1512,11 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                         border: none !important;
                         box-shadow: none !important;
                         width: 100% !important;
-                        height: 100% !important;
+                        height: auto !important;
+                    }
+
+                    .tab-content {
+                        overflow: visible !important;
                     }
 
                     .qr-grid { 
@@ -1527,9 +1531,10 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                         justify-content: center !important;
                         align-items: center !important;
                         width: 100vw !important;
-                        height: 98vh !important;
-                        page-break-after: always;
-                        page-break-inside: avoid;
+                        height: 100vh !important;
+                        page-break-after: always !important;
+                        page-break-before: always !important;
+                        page-break-inside: avoid !important;
                         border: none !important; 
                         box-shadow: none !important; 
                         color: black !important;
@@ -1542,19 +1547,36 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                     .qr-card h4 {
                         font-size: 5rem !important;
                         margin-bottom: 2rem !important;
+                        color: black !important;
                     }
 
                     .qr-wrapper {
                         padding: 0 !important;
+                        background: white !important;
                     }
 
                     .qr-wrapper svg {
-                        width: 500px !important;
-                        height: 500px !important;
+                        width: 600px !important;
+                        height: 600px !important;
                     }
 
                     .qr-url {
-                        display: none !important;
+                        display: block !important;
+                        font-size: 1.5rem !important;
+                        font-weight: bold !important;
+                        color: black !important;
+                        margin-top: 2rem !important;
+                        word-break: break-all !important;
+                    }
+
+                    /* Special handling for the main QR card to ensure it also breaks correctly */
+                    div[style*="marginBottom: 2.5rem"] {
+                        margin: 0 !important;
+                        display: block !important;
+                    }
+                    div[style*="marginBottom: 2.5rem"] .qr-card {
+                        background: white !important;
+                        border: none !important;
                     }
                 }
 
