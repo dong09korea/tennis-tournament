@@ -1497,86 +1497,108 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                 
                 /* Print Styles */
                 @media print {
-                    @page { size: A4 portrait; margin: 0; }
-                    /* Hide non-printable elements */
-                    .dashboard-header, .tab-navigation, .card-header, .card-desc, .right-col, button, .status-badge {
-                        display: none !important;
+                    @page { 
+                        size: A4 portrait; 
+                        margin: 0; 
                     }
                     
-                    /* Reset layouts to allow natural page flow */
-                    body, .dashboard-container, .dashboard-grid, .left-col, .glass-card, .tab-content {
-                        display: block !important;
-                        margin: 0 !important;
-                        padding: 0 !important;
-                        background: white !important;
-                        border: none !important;
-                        box-shadow: none !important;
-                        width: 100% !important;
-                        height: auto !important;
+                    /* Hide everything except the QR tab content */
+                    body * {
+                        visibility: hidden !important;
+                    }
+                    
+                    .tab-content, .tab-content * {
+                        visibility: visible !important;
                     }
 
                     .tab-content {
-                        overflow: visible !important;
-                    }
-
-                    .qr-grid { 
-                        display: block !important; 
-                        padding: 0 !important; 
-                        margin: 0 !important;
-                    }
-                    
-                    .qr-card { 
-                        display: flex !important;
-                        flex-direction: column !important;
-                        justify-content: center !important;
-                        align-items: center !important;
-                        width: 100vw !important;
-                        height: 100vh !important;
-                        page-break-after: always !important;
-                        page-break-before: always !important;
-                        page-break-inside: avoid !important;
-                        border: none !important; 
-                        box-shadow: none !important; 
-                        color: black !important;
-                        background: white !important;
+                        position: absolute !important;
+                        left: 0 !important;
+                        top: 0 !important;
+                        width: 100% !important;
                         margin: 0 !important;
                         padding: 0 !important;
+                        background: white !important;
+                        display: block !important;
+                        visibility: visible !important;
+                    }
+
+                    /* Hide interactive/nested elements inside tab-content */
+                    .card-header, .card-desc, button, .status-badge, .dashboard-header, .tab-navigation {
+                        display: none !important;
+                    }
+
+                    /* Unset grid/flex for print and allow block flow */
+                    .qr-grid {
+                        display: block !important;
+                        width: 100% !important;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                    }
+
+                    /* Container for the Main QR (Target specific div by structure if needed) */
+                    div[style*="marginBottom: 2.5rem"] {
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        display: block !important;
+                        width: 100% !important;
+                    }
+
+                    .qr-card {
+                        visibility: visible !important;
+                        display: flex !important;
+                        flex-direction: column !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                        width: 210mm !important; /* A4 Width */
+                        height: 297mm !important; /* A4 Height */
+                        page-break-after: always !important;
+                        page-break-inside: avoid !important;
+                        margin: 0 !important;
+                        padding: 20mm !important;
+                        background: white !important;
+                        border: none !important;
+                        box-shadow: none !important;
+                        color: black !important;
                         box-sizing: border-box !important;
                     }
-                    
+
                     .qr-card h4 {
-                        font-size: 5rem !important;
-                        margin-bottom: 2rem !important;
+                        font-size: 4rem !important;
+                        margin: 0 0 20mm 0 !important;
                         color: black !important;
+                        text-align: center !important;
+                        font-weight: 800 !important;
                     }
 
                     .qr-wrapper {
-                        padding: 0 !important;
+                        display: flex !important;
+                        align-items: center !important;
+                        justify-content: center !important;
                         background: white !important;
+                        padding: 0 !important;
+                        margin-bottom: 10mm !important;
                     }
 
                     .qr-wrapper svg {
-                        width: 600px !important;
-                        height: 600px !important;
+                        width: 140mm !important; /* Scaled for A4 visibility */
+                        height: 140mm !important;
                     }
 
                     .qr-url {
                         display: block !important;
-                        font-size: 1.5rem !important;
+                        font-size: 1.8rem !important;
                         font-weight: bold !important;
                         color: black !important;
-                        margin-top: 2rem !important;
+                        margin-top: 5mm !important;
+                        text-align: center !important;
                         word-break: break-all !important;
                     }
 
-                    /* Special handling for the main QR card to ensure it also breaks correctly */
-                    div[style*="marginBottom: 2.5rem"] {
-                        margin: 0 !important;
-                        display: block !important;
-                    }
-                    div[style*="marginBottom: 2.5rem"] .qr-card {
-                        background: white !important;
-                        border: none !important;
+                    p[style*="color: #aaa"] {
+                        font-size: 1.2rem !important;
+                        color: #333 !important;
+                        margin-top: 5mm !important;
                     }
                 }
 
