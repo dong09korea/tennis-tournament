@@ -200,9 +200,9 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
               const gn = String(groupName);
               return g === gn || g === gn.replace(/조$/, '') || g.replace(/조$/, '') === gn.replace(/조$/, '');
             });
-            const allGroupMatchesDone = groupMatches.length > 0 && groupMatches.every(m => m.status === 'COMPLETED');
+            const groupMatchesDone = groupMatches.length > 0 && groupMatches.every(m => m.status === 'COMPLETED');
+            const allTiedTeamsFinished = tiedIds.size > 0 && [...tiedIds].every(id => groupTeams.find(t => t.id === id)?.played === 3);
             const allTiedAgesEntered = tiedIds.size > 0 && [...tiedIds].every(id => tiebreakAges[id] !== undefined);
-            // Check if tiebreak is already confirmed (saved to Firebase)
             const tieAlreadyConfirmed = tiedIds.size > 0 && [...tiedIds].every(id => {
               const t = groupTeams.find(t => t.id === id);
               return t?.tiebreakAge !== undefined;
@@ -235,7 +235,7 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                   const goalDiff = team.goalDiff || 0;
 
                   const isDirect = index < 2 && played > 0;
-                  const isWild = wildcardIds.has(team.id) && allGroupMatchesDone;
+                  const isWild = wildcardIds.has(team.id) && groupMatchesDone;
                   const isAbsent = team.club === '불참';
                   const rowMod = isAbsent ? 'row-absent' : (isDirect ? 'row-direct' : isWild ? 'row-wild' : '');
                   const isTied = tiedIds.has(team.id);
@@ -251,8 +251,8 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                         <div className="sc-name">{p1}</div>
                         {p2 && <div className="sc-name2">{p2}</div>}
                         {team.club && <div className="sc-club" style={{ color: getClubColor(team.club) }}>{team.club}</div>}
-                        {/* Admin tiebreaker age input — shown only when ALL group matches are completed AND there is a tie */}
-                        {isAdmin && isTied && allGroupMatchesDone && (() => {
+                        {/* Admin tiebreaker age input (only for teams that finished 3 matches) */}
+                        {isAdmin && isTied && played === 3 && (() => {
                           const ageEntered = tiebreakAges[team.id] !== undefined;
                           return (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '5px' }}>
@@ -299,7 +299,7 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                 })}
 
                 {/* Confirm tiebreaker button */}
-                {isAdmin && allGroupMatchesDone && tiedIds.size > 0 && !tieAlreadyConfirmed && (
+                {isAdmin && allTiedTeamsFinished && tiedIds.size > 0 && !tieAlreadyConfirmed && (
                   <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(255,155,85,0.3)' }}>
                     <button
                       onClick={() => confirmTiebreaker(tiedIds, onConfirmTiebreaker)}
@@ -317,7 +317,7 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                     </button>
                   </div>
                 )}
-                {isAdmin && allGroupMatchesDone && tieAlreadyConfirmed && (
+                {isAdmin && allTiedTeamsFinished && tieAlreadyConfirmed && (
                   <div style={{ padding: '6px 12px', fontSize: '0.72rem', color: '#4caf50', textAlign: 'center' }}>
                     ✅ 나이 순위 확정 완료 — 브라켓 슬롯이 자동 업데이트됩니다
                   </div>
