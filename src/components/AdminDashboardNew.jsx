@@ -1209,14 +1209,14 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                 </div>
                                 <p className="card-desc">아래의 접속용 QR코드 및 코트별 점수 입력 QR코드를 인쇄하여 현장에 배치하세요.</p>
 
-                                <div style={{ marginBottom: '2.5rem', textAlign: 'center' }}>
-                                    <h4 style={{ color: 'var(--tennis-yellow)', marginBottom: '15px', fontSize: '1.2rem' }}>🌐 모바일 접속용 전체 QR 출입증 (Racket Up)</h4>
-                                    <div className="qr-card" style={{ display: 'inline-block', maxWidth: '350px', background: 'rgba(213,255,0,0.05)', borderColor: 'var(--tennis-yellow)' }}>
-                                        <div className="qr-wrapper" style={{ padding: '15px', background: 'white' }}>
-                                            <QRCodeSVG value="https://racketup.vercel.app/" size={200} level={"H"} />
+                                <div className="main-qr-section" style={{ marginBottom: '2.5rem', display: 'flex', justifyContent: 'center' }}>
+                                    <div className="qr-card main-qr-card" style={{ maxWidth: '420px', background: 'rgba(213,255,0,0.05)', border: '2px solid var(--tennis-yellow)', padding: '2rem', borderRadius: '16px' }}>
+                                        <h4 className="main-qr-title" style={{ color: 'var(--tennis-yellow)', marginBottom: '20px', fontSize: '1.5rem', wordBreak: 'keep-all' }}>🌐 모바일 접속 QR 출입증</h4>
+                                        <div className="qr-wrapper" style={{ padding: '20px', background: 'white', display: 'inline-block', borderRadius: '12px' }}>
+                                            <QRCodeSVG value="https://racketup.vercel.app/" size={250} level={"H"} />
                                         </div>
-                                        <p className="qr-url" style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--tennis-yellow)', marginTop: '10px' }}>https://racketup.vercel.app/</p>
-                                        <p style={{ color: '#aaa', fontSize: '0.85rem', marginTop: '10px', marginBottom: '10px' }}>스마트폰 카메라로 스캔하여 사이트에 접속하세요!</p>
+                                        <p className="qr-url" style={{ fontSize: '1.4rem', fontWeight: 'bold', color: 'var(--tennis-yellow)', marginTop: '20px', marginBottom: '10px' }}>https://racketup.vercel.app/</p>
+                                        <p className="qr-desc" style={{ color: '#aaa', fontSize: '1rem', margin: '0' }}>스마트폰 카메라로 스캔하여 접속하세요!</p>
                                     </div>
                                 </div>
 
@@ -1549,8 +1549,8 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                         padding: 0 !important;
                     }
 
-                    /* Unset the flex parent container of the main QR to prevent issues */
-                    div[style*="marginBottom: 2.5rem"] {
+                    /* Unset the flex parent container to prevent issues */
+                    .main-qr-section, div[style*="marginBottom: 2.5rem"] {
                         margin: 0 !important;
                         padding: 0 !important;
                         display: block !important;
@@ -1576,11 +1576,17 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                     }
 
                     .qr-card h4 {
-                        font-size: 4rem !important;
+                        font-size: 4.5rem !important;
                         margin: 0 0 20mm 0 !important;
                         color: black !important;
                         text-align: center !important;
                         font-weight: 800 !important;
+                    }
+
+                    /* Make the main QR title slightly smaller to prevent huge multi-line wrapping */
+                    .qr-card h4.main-qr-title {
+                        font-size: 3rem !important;
+                        line-height: 1.2 !important;
                     }
 
                     .qr-wrapper {
@@ -1607,10 +1613,11 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                         word-break: break-all !important;
                     }
 
-                    p[style*="color: #aaa"] {
+                    p[style*="color: #aaa"], .qr-desc {
                         font-size: 1.2rem !important;
                         color: #333 !important;
                         margin-top: 5mm !important;
+                        text-align: center !important;
                     }
                 }
 
