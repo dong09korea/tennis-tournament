@@ -513,22 +513,23 @@ const assignWildcards = (wildcardTeams, exactBracketSlots, allTeamsMap) => {
 // Describes which group rank fills each of the 16 first-round match slots.
 // 'W' = wildcard (조 3위). Used by both shell init and progressive filling.
 export const FIXED_BRACKET_LAYOUT = [
-    { a: { rank: 1, g: 1 }, b: { rank: 2, g: 5 } },   // M1  (no wildcard)
-    { a: { rank: 1, g: 2 }, b: { rank: 3, g: 'W' } }, // M2
-    { a: { rank: 1, g: 3 }, b: { rank: 2, g: 7 } },   // M3  (no wildcard)
-    { a: { rank: 1, g: 4 }, b: { rank: 3, g: 'W' } }, // M4
-    { a: { rank: 1, g: 5 }, b: { rank: 3, g: 'W' } }, // M5
-    { a: { rank: 1, g: 6 }, b: { rank: 2, g: 10 } },  // M6  (no wildcard)
-    { a: { rank: 1, g: 7 }, b: { rank: 3, g: 'W' } }, // M7
-    { a: { rank: 1, g: 8 }, b: { rank: 2, g: 12 } },  // M8  (no wildcard)
-    { a: { rank: 1, g: 9 }, b: { rank: 3, g: 'W' } }, // M9
-    { a: { rank: 1, g: 10 }, b: { rank: 2, g: 6 } },  // M10 (no wildcard)
-    { a: { rank: 1, g: 11 }, b: { rank: 3, g: 'W' } },// M11
-    { a: { rank: 1, g: 12 }, b: { rank: 2, g: 8 } },  // M12 (no wildcard)
-    { a: { rank: 2, g: 4 }, b: { rank: 2, g: 9 } },   // M13 (no wildcard)
-    { a: { rank: 2, g: 3 }, b: { rank: 3, g: 'W' } }, // M14
-    { a: { rank: 2, g: 2 }, b: { rank: 2, g: 11 } },  // M15 (no wildcard)
-    { a: { rank: 2, g: 1 }, b: { rank: 3, g: 'W' } }  // M16
+    { a: { rank: 1, g: 1 }, b: { rank: 2, g: 5 } },   // M1  (no wildcard, Court 1 priority)
+    { a: { rank: 1, g: 10 }, b: { rank: 2, g: 6 } },  // M2  (no wildcard, Court 2 priority)
+    { a: { rank: 1, g: 3 }, b: { rank: 2, g: 7 } },   // M3  (no wildcard, Court 3 priority)
+    { a: { rank: 1, g: 12 }, b: { rank: 2, g: 8 } },  // M4  (no wildcard, Court 4 priority)
+    { a: { rank: 1, g: 6 }, b: { rank: 2, g: 10 } },  // M5  (no wildcard, Court 5 priority)
+    { a: { rank: 2, g: 4 }, b: { rank: 2, g: 9 } },   // M6  (no wildcard, Court 6 priority)
+    { a: { rank: 2, g: 2 }, b: { rank: 2, g: 11 } },  // M7  (no wildcard, Court 7 priority)
+    { a: { rank: 1, g: 8 }, b: { rank: 2, g: 12 } },  // M8  (no wildcard, Court 8 priority)
+    // Matches 9~16 contain all Wildcard games so they can be assigned dynamic later
+    { a: { rank: 1, g: 2 }, b: { rank: 3, g: 'W' } }, // M9
+    { a: { rank: 1, g: 4 }, b: { rank: 3, g: 'W' } }, // M10
+    { a: { rank: 1, g: 5 }, b: { rank: 3, g: 'W' } }, // M11
+    { a: { rank: 1, g: 7 }, b: { rank: 3, g: 'W' } }, // M12
+    { a: { rank: 1, g: 9 }, b: { rank: 3, g: 'W' } }, // M13
+    { a: { rank: 1, g: 11 }, b: { rank: 3, g: 'W' } },// M14
+    { a: { rank: 2, g: 1 }, b: { rank: 3, g: 'W' } }, // M15
+    { a: { rank: 2, g: 3 }, b: { rank: 3, g: 'W' } }  // M16
 ];
 
 // Create an empty 32-bracket shell (all slots TBD) to store in Firebase early.
@@ -648,23 +649,23 @@ export const generateBracket32 = (top32Teams, groupedStandings) => {
     // 2. Define the exact fixed bracket mapping (1-16)
     // "W" implies a wildcard slot (3위)
     const fixedLayout = [
-        { a: { rank: 1, g: 1 }, b: { rank: 2, g: 5 } },   // M1
-        { a: { rank: 1, g: 2 }, b: { rank: 3, g: 'W' } }, // M2
-        { a: { rank: 1, g: 3 }, b: { rank: 2, g: 7 } },   // M3
-        { a: { rank: 1, g: 4 }, b: { rank: 3, g: 'W' } }, // M4
-        { a: { rank: 1, g: 5 }, b: { rank: 3, g: 'W' } }, // M5
-        { a: { rank: 1, g: 6 }, b: { rank: 2, g: 10 } },  // M6
-        { a: { rank: 1, g: 7 }, b: { rank: 3, g: 'W' } }, // M7
-        { a: { rank: 1, g: 8 }, b: { rank: 2, g: 12 } },  // M8
-        // -- Split (우측 화면)
-        { a: { rank: 1, g: 9 }, b: { rank: 3, g: 'W' } }, // M9
-        { a: { rank: 1, g: 10 }, b: { rank: 2, g: 6 } },   // M10
-        { a: { rank: 1, g: 11 }, b: { rank: 3, g: 'W' } }, // M11
-        { a: { rank: 1, g: 12 }, b: { rank: 2, g: 8 } },   // M12
-        { a: { rank: 2, g: 4 }, b: { rank: 2, g: 9 } },   // M13
-        { a: { rank: 2, g: 3 }, b: { rank: 3, g: 'W' } }, // M14
-        { a: { rank: 2, g: 2 }, b: { rank: 2, g: 11 } },  // M15
-        { a: { rank: 2, g: 1 }, b: { rank: 3, g: 'W' } }  // M16
+        { a: { rank: 1, g: 1 }, b: { rank: 2, g: 5 } },   // M1  (Court 1 priority)
+        { a: { rank: 1, g: 10 }, b: { rank: 2, g: 6 } },  // M2  (Court 2 priority)
+        { a: { rank: 1, g: 3 }, b: { rank: 2, g: 7 } },   // M3  (Court 3 priority)
+        { a: { rank: 1, g: 12 }, b: { rank: 2, g: 8 } },  // M4  (Court 4 priority)
+        { a: { rank: 1, g: 6 }, b: { rank: 2, g: 10 } },  // M5  (Court 5 priority)
+        { a: { rank: 2, g: 4 }, b: { rank: 2, g: 9 } },   // M6  (Court 6 priority)
+        { a: { rank: 2, g: 2 }, b: { rank: 2, g: 11 } },  // M7  (Court 7 priority)
+        { a: { rank: 1, g: 8 }, b: { rank: 2, g: 12 } },  // M8  (Court 8 priority)
+        // Matches 9~16 contain all Wildcard games
+        { a: { rank: 1, g: 2 }, b: { rank: 3, g: 'W' } }, // M9
+        { a: { rank: 1, g: 4 }, b: { rank: 3, g: 'W' } }, // M10
+        { a: { rank: 1, g: 5 }, b: { rank: 3, g: 'W' } }, // M11
+        { a: { rank: 1, g: 7 }, b: { rank: 3, g: 'W' } }, // M12
+        { a: { rank: 1, g: 9 }, b: { rank: 3, g: 'W' } }, // M13
+        { a: { rank: 1, g: 11 }, b: { rank: 3, g: 'W' } },// M14
+        { a: { rank: 2, g: 1 }, b: { rank: 3, g: 'W' } }, // M15
+        { a: { rank: 2, g: 3 }, b: { rank: 3, g: 'W' } }  // M16
     ];
 
     // Helper to fetch the actual team object
