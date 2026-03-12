@@ -198,6 +198,23 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
             const sortedTeams = [...teams].sort((a, b) => (a.drawOrder ?? 9999) - (b.drawOrder ?? 9999));
             const groups = generateGroups(sortedTeams, numGroups);
             const matches = generateSchedule(groups);
+
+            // --- SPECIAL PROCESSING: Auto-complete matches against the "Absent" team ---
+            matches.forEach(m => {
+                const teamA = teams.find(t => t.id === m.team_a_id);
+                const teamB = teams.find(t => t.id === m.team_b_id);
+                
+                const isAbsentA = teamA && (teamA.name.includes("불참") || teamA.club === "불참");
+                const isAbsentB = teamB && (teamB.name.includes("불참") || teamB.club === "불참");
+                
+                if (isAbsentA || isAbsentB) {
+                    m.status = 'COMPLETED';
+                    m.score_a = isAbsentA ? 0 : 6;
+                    m.score_b = isAbsentB ? 0 : 6;
+                    m.winner_id = isAbsentA ? m.team_b_id : m.team_a_id;
+                }
+            });
+
             const courts = Array.from({ length: numCourts }, (_, i) => ({
                 id: i + 1,
                 match_id: null
