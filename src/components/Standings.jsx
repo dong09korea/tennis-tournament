@@ -236,7 +236,8 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
 
                   const isDirect = index < 2 && played > 0;
                   const isWild = wildcardIds.has(team.id) && allGroupMatchesDone;
-                  const rowMod = isDirect ? 'row-direct' : isWild ? 'row-wild' : '';
+                  const isAbsent = team.club === '불참';
+                  const rowMod = isAbsent ? 'row-absent' : (isDirect ? 'row-direct' : isWild ? 'row-wild' : '');
                   const isTied = tiedIds.has(team.id);
 
                   const parts = team.name ? team.name.split('/') : [team.name];
@@ -382,7 +383,8 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
 
               // Top 8 teams in this list are wildcard eligible
               const isWild = index < 8 && played > 0;
-              const rowMod = isWild ? 'row-wild' : '';
+              const isAbsent = team.club === '불참';
+              const rowMod = isAbsent ? 'row-absent' : (isWild ? 'row-wild' : '');
 
               const parts = team.name ? team.name.split('/') : [team.name];
               const p1 = parts[0] || '';
@@ -402,8 +404,8 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                     {p2 && <div className="sc-name2">{p2}</div>}
                     {team.club && <div className="sc-club" style={{ color: getClubColor(team.club) }}>{team.club}</div>}
                     
-                    {/* Admin tiebreaker age input for Wildcards */}
-                    {isAdmin && tiedIds.has(team.id) && (() => {
+                    {/* Admin tiebreaker age input for Wildcards (only for teams that finished 3 matches) */}
+                    {isAdmin && tiedIds.has(team.id) && played === 3 && (() => {
                       const ageEntered = tiebreakAges[team.id] !== undefined;
                       return (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '5px' }}>
@@ -695,7 +697,11 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
           background: rgba(85, 153, 255, 0.06);
           border-left: 3px solid #5599ff;
         }
-        .sc-row:not(.row-direct):not(.row-wild) {
+        .sc-row.row-absent {
+          background: rgba(255, 68, 68, 0.15);
+          border-left: 3px solid #ff4444;
+        }
+        .sc-row:not(.row-direct):not(.row-wild):not(.row-absent) {
           border-left: 3px solid transparent;
         }
 
@@ -710,6 +716,7 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
         }
         .row-direct .sc-rank { color: #d5ff00; }
         .row-wild   .sc-rank { color: #5599ff; }
+        .row-absent .sc-rank { color: #ff4444; }
 
         /* Team name area */
         .sc-team {
@@ -748,6 +755,8 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
         .row-direct .sc-name2 { color: #b8d500; }
         .row-wild   .sc-name  { color: #88bbff; }
         .row-wild   .sc-name2 { color: #6699dd; }
+        .row-absent .sc-name  { color: #ff8888; }
+        .row-absent .sc-name2 { color: #ffaaaa; }
 
         /* Stat cells */
         .sc-stat {
