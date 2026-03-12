@@ -39,11 +39,22 @@ const SplashScreen = ({ onEnter }) => {
                 boxShadow: '0 8px 40px rgba(0,0,0,0.5)',
                 maxWidth: '340px',
                 width: '88vw',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '10px',
+                padding: '10px',
+                boxSizing: 'border-box'
             }}>
                 <img
                     src="/ad.png"
                     alt="DAIN 3D 프린팅 광고"
-                    style={{ width: '100%', display: 'block' }}
+                    style={{ width: '100%', display: 'block', borderRadius: '10px' }}
+                />
+                <div style={{ height: '1px', background: '#eee', margin: '2px 0' }}></div>
+                <img
+                    src="/ad2.png"
+                    alt="RaUm scent 광고"
+                    style={{ width: '100%', display: 'block', borderRadius: '10px' }}
                 />
             </div>
 

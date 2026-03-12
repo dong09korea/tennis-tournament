@@ -44,6 +44,7 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
       {/* ── Full-Width Ad Section at bottom of page ── */}
       <div className="bottom-ad-section">
         <img src="/ad.png" alt="DAIN 3D 프린팅" className="bottom-ad-full-img" />
+        <img src="/ad2.png" alt="RaUm scent 프리미엄 홈 프래그런스" className="bottom-ad-full-img" />
       </div>
 
       <style>{`
@@ -108,7 +109,10 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
           background: #fff;
           border-top: 3px solid #1a73e8;
           display: flex;
-          justify-content: center;
+          flex-direction: column;
+          align-items: center;
+          gap: 10px;
+          padding: 10px 0;
         }
         .bottom-ad-full-img {
           width: 100%;
