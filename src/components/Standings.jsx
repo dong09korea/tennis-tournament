@@ -482,7 +482,6 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                             <button
                               onClick={async () => {
                                 await confirmTiebreaker(new Set(groupIds), onConfirmTiebreaker);
-                                if (onPushWildcardsToBracket) onPushWildcardsToBracket();
                               }}
                               disabled={confirming || !allAgesEntered}
                               style={{
@@ -494,7 +493,7 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                                 transition: 'all 0.2s', boxShadow: allAgesEntered ? '0 4px 15px rgba(29,233,182,0.4)' : 'none'
                               }}
                             >
-                              {confirming ? '저장 중...' : (!allAgesEntered ? '⚠️ 위 동점팀들의 합산나이를 모두 입력해주세요' : `🏆 [${tiedGroup.map(t => String(t.group_id || t.initial_group || '').replace('조','')).join(', ')}조 동점팀] — 나이 확정 및 32강 배치 대상 포함`)}
+                              {confirming ? '저장 중...' : (!allAgesEntered ? '⚠️ 위 동점팀들의 합산나이를 모두 입력해주세요' : `💾 [${tiedGroup.map(t => String(t.group_id || t.initial_group || '').replace('조','')).join(', ')}조 동점팀] — 나이 기록 저장`)}
                             </button>
                           </div>
                         );
@@ -505,6 +504,54 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                 </React.Fragment>
               );
             })}
+            
+            {/* Global Wildcard Push Button */}
+            {isAdmin && (() => {
+                const groupMatches = (matches || []).filter(m => m.group_id && !String(m.group_id).includes('강') && !String(m.group_id).includes('결승'));
+                const allDone = groupMatches.length > 0 && groupMatches.every(m => m.status === 'COMPLETED');
+                
+                // Check if there are any unresolved ties
+                let hasUnresolvedTies = false;
+                tiedGroups.forEach(grp => {
+                    if (grp.some(t => t.tiebreakAge === undefined)) hasUnresolvedTies = true;
+                });
+
+                if (allDone) {
+                    return (
+                        <div style={{ padding: '1.5rem', background: 'rgba(0,0,0,0.4)', textAlign: 'center', borderTop: '2px solid rgba(255,155,85,0.3)', marginTop: '1rem', borderRadius: '0 0 14px 14px' }}>
+                            <button
+                                onClick={() => {
+                                    if (onPushWildcardsToBracket) onPushWildcardsToBracket();
+                                }}
+                                disabled={hasUnresolvedTies}
+                                style={{
+                                    padding: '16px 32px',
+                                    fontSize: '1.1rem',
+                                    fontWeight: 900,
+                                    background: hasUnresolvedTies ? '#555' : 'linear-gradient(135deg, #1de9b6, #00bfa5)',
+                                    color: hasUnresolvedTies ? '#aaa' : '#000',
+                                    border: 'none',
+                                    borderRadius: '12px',
+                                    cursor: hasUnresolvedTies ? 'not-allowed' : 'pointer',
+                                    boxShadow: hasUnresolvedTies ? 'none' : '0 6px 20px rgba(29, 233, 182, 0.4)',
+                                    transition: 'all 0.2s',
+                                    width: '100%',
+                                    maxWidth: '400px'
+                                }}
+                            >
+                                {hasUnresolvedTies ? '⚠️ 나이 미확정 야생동점 존재 (32강 투입 불가)' : '🔥 와일드카드 32강 대진표 일괄 투입 🔥'}
+                            </button>
+                            {!hasUnresolvedTies && (
+                                <div style={{ color: '#aaa', fontSize: '0.8rem', marginTop: '10px' }}>
+                                    모든 예선이 종료되었고 동점 순위가 확정되었습니다. 버튼을 누르면 와일드카드들이 32강 빈 자리에 자동 매칭됩니다.
+                                </div>
+                            )}
+                        </div>
+                    );
+                }
+                return null;
+            })()}
+
             </>
           );
         })()}
