@@ -150,12 +150,28 @@ export const isGroupMatch = (m) => {
     return typeof g === 'number' || (typeof g === 'string' && g.includes('조')) || /^\d+$/.test(String(g));
 };
 
+// Strict Court Schedule for Group Stages (from user image)
+const FIXED_COURT_SCHEDULE = {
+    "1": [ { g: 11, m: 1 }, { g: 1, m: 1 }, { g: 1, m: 2 }, { g: 1, m: 3 }, { g: 1, m: 4 }, { g: 1, m: 5 }, { g: 1, m: 6 } ],
+    "2": [ { g: 2, m: 1 }, { g: 11, m: 2 }, { g: 2, m: 2 }, { g: 2, m: 3 }, { g: 2, m: 4 }, { g: 2, m: 5 }, { g: 12, m: 5 }, { g: 2, m: 6 } ],
+    "3": [ { g: 3, m: 1 }, { g: 3, m: 2 }, { g: 11, m: 3 }, { g: 3, m: 3 }, { g: 3, m: 4 }, { g: 3, m: 5 }, { g: 3, m: 6 }, { g: 12, m: 6 } ],
+    "4": [ { g: 4, m: 1 }, { g: 4, m: 2 }, { g: 4, m: 3 }, { g: 11, m: 4 }, { g: 4, m: 4 }, { g: 4, m: 5 }, { g: 4, m: 6 } ],
+    "5": [ { g: 5, m: 1 }, { g: 5, m: 2 }, { g: 5, m: 3 }, { g: 5, m: 4 }, { g: 11, m: 5 }, { g: 5, m: 5 }, { g: 5, m: 6 } ],
+    "6": [ { g: 6, m: 1 }, { g: 6, m: 2 }, { g: 6, m: 3 }, { g: 6, m: 4 }, { g: 6, m: 5 }, { g: 11, m: 6 }, { g: 6, m: 6 } ],
+    "7": [ { g: 7, m: 1 }, { g: 7, m: 2 }, { g: 7, m: 3 }, { g: 7, m: 4 }, { g: 12, m: 4 }, { g: 7, m: 5 }, { g: 7, m: 6 } ],
+    "8": [ { g: 8, m: 1 }, { g: 8, m: 2 }, { g: 8, m: 3 }, { g: 12, m: 3 }, { g: 8, m: 4 }, { g: 8, m: 5 }, { g: 8, m: 6 } ],
+    "9": [ { g: 9, m: 1 }, { g: 9, m: 2 }, { g: 12, m: 2 }, { g: 9, m: 3 }, { g: 9, m: 4 }, { g: 9, m: 5 }, { g: 9, m: 6 } ],
+    "10": [ { g: 10, m: 1 }, { g: 12, m: 1 }, { g: 10, m: 2 }, { g: 10, m: 3 }, { g: 10, m: 4 }, { g: 10, m: 5 }, { g: 10, m: 6 } ]
+};
+
 // Assign Matches to Courts
 // Returns updated { matches, courts }
 export const assignMatchesToCourts = (matches, courts) => {
     // Deep copy to avoid mutation issues during calculation
     let nextMatches = JSON.parse(JSON.stringify(matches));
     let nextCourts = JSON.parse(JSON.stringify(courts));
+
+    const getGroupNum = (gStr) => parseInt(String(gStr).replace(/[^0-9]/g, ''), 10);
 
     // 1. Identify Busy Teams (currently playing)
     const busyTeams = new Set();
@@ -178,46 +194,80 @@ export const assignMatchesToCourts = (matches, courts) => {
 
     if (emptyCourts.length === 0) return { matches: nextMatches, courts: nextCourts };
 
-    // 3. Get Pending Matches
-    // Skip matches where either team is TBD or BYE.
-    // A 32강 match enters the queue only when BOTH teams are confirmed.
-    // Wildcard slots in 32강 stay TBD until all groups finish (handled in App.jsx),
-    // so those naturally stay out of court assignment until the right moment.
-    let pendingMatches = nextMatches.filter(m =>
+    // 3. Keep a dynamic fallback queue ONLY for matches that are not in the fixed schedule (e.g., knockouts)
+    let pendingKnockoutMatches = nextMatches.filter(m =>
         m.status === 'PENDING' &&
         !m.court_id &&
         m.team_a_id !== 'TBD' && m.team_a_id !== 'BYE' &&
-        m.team_b_id !== 'TBD' && m.team_b_id !== 'BYE'
+        m.team_b_id !== 'TBD' && m.team_b_id !== 'BYE' &&
+        !isGroupMatch(m) // Only pull knockout/final matches dynamically
     );
 
     // Sort by round ascending so earlier matches get priority
-    pendingMatches.sort((a, b) => a.round - b.round);
+    pendingKnockoutMatches.sort((a, b) => a.round - b.round);
 
-    // 4. Assign
+    // 4. Assign Courts
     for (const court of emptyCourts) {
-        // Find a playable match
-        const candidateIndex = pendingMatches.findIndex(m =>
-            !busyTeams.has(m.team_a_id) && !busyTeams.has(m.team_b_id)
-        );
+        let courtAssigned = false;
+        const courtStrId = String(court.id);
+        const fixedQueue = FIXED_COURT_SCHEDULE[courtStrId];
 
-        if (candidateIndex !== -1) {
-            const match = pendingMatches[candidateIndex];
+        // 4.1. Try to assign from strict group schedule
+        if (fixedQueue) {
+            for (const item of fixedQueue) {
+                const scheduledMatch = nextMatches.find(m =>
+                    isGroupMatch(m) &&
+                    getGroupNum(m.group_id) === item.g &&
+                    m.match_in_group === item.m
+                );
 
-            // Update Match status
-            // We need to update the match in the main list 'nextMatches'
-            const matchInMainList = nextMatches.find(m => m.id === match.id);
-            matchInMainList.status = 'LIVE';
-            matchInMainList.court_id = court.id;
+                if (scheduledMatch) {
+                    if (scheduledMatch.status !== 'COMPLETED') {
+                        // Found the next required match for this court.
+                        if (scheduledMatch.status === 'PENDING' &&
+                            !scheduledMatch.court_id &&
+                            !busyTeams.has(scheduledMatch.team_a_id) &&
+                            !busyTeams.has(scheduledMatch.team_b_id) &&
+                            scheduledMatch.team_a_id !== 'TBD' && scheduledMatch.team_a_id !== 'BYE' &&
+                            scheduledMatch.team_b_id !== 'TBD' && scheduledMatch.team_b_id !== 'BYE') 
+                        {
+                            // Assign
+                            scheduledMatch.status = 'LIVE';
+                            scheduledMatch.court_id = court.id;
+                            court.match_id = scheduledMatch.id;
 
-            // Update Court
-            court.match_id = match.id;
+                            busyTeams.add(scheduledMatch.team_a_id);
+                            busyTeams.add(scheduledMatch.team_b_id);
+                        }
+                        
+                        // We strictly block the court with this specific match until it's COMPLETE.
+                        courtAssigned = true;
+                        break;
+                    }
+                }
+            }
+        }
 
-            // Mark teams as busy
-            busyTeams.add(match.team_a_id);
-            busyTeams.add(match.team_b_id);
+        // 4.2. Fallback to Dynamic Queue (Knockouts) if fixed schedule is completely done or non-existent
+        if (!courtAssigned) {
+            const candidateIndex = pendingKnockoutMatches.findIndex(m =>
+                !busyTeams.has(m.team_a_id) && !busyTeams.has(m.team_b_id)
+            );
 
-            // Remove from local pending list
-            pendingMatches.splice(candidateIndex, 1);
+            if (candidateIndex !== -1) {
+                const match = pendingKnockoutMatches[candidateIndex];
+
+                const matchInMainList = nextMatches.find(m => m.id === match.id);
+                matchInMainList.status = 'LIVE';
+                matchInMainList.court_id = court.id;
+                
+                court.match_id = match.id;
+
+                busyTeams.add(match.team_a_id);
+                busyTeams.add(match.team_b_id);
+
+                pendingKnockoutMatches.splice(candidateIndex, 1);
+            }
         }
     }
 
