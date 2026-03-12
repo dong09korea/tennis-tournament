@@ -152,16 +152,16 @@ export const isGroupMatch = (m) => {
 
 // Strict Court Schedule for Group Stages (from user image)
 const FIXED_COURT_SCHEDULE = {
-    "1": [ { g: 11, m: 1 }, { g: 1, m: 1 }, { g: 1, m: 2 }, { g: 1, m: 3 }, { g: 1, m: 4 }, { g: 1, m: 5 }, { g: 1, m: 6 } ],
-    "2": [ { g: 2, m: 1 }, { g: 11, m: 2 }, { g: 2, m: 2 }, { g: 2, m: 3 }, { g: 2, m: 4 }, { g: 2, m: 5 }, { g: 12, m: 5 }, { g: 2, m: 6 } ],
-    "3": [ { g: 3, m: 1 }, { g: 3, m: 2 }, { g: 11, m: 3 }, { g: 3, m: 3 }, { g: 3, m: 4 }, { g: 3, m: 5 }, { g: 3, m: 6 }, { g: 12, m: 6 } ],
-    "4": [ { g: 4, m: 1 }, { g: 4, m: 2 }, { g: 4, m: 3 }, { g: 11, m: 4 }, { g: 4, m: 4 }, { g: 4, m: 5 }, { g: 4, m: 6 } ],
-    "5": [ { g: 5, m: 1 }, { g: 5, m: 2 }, { g: 5, m: 3 }, { g: 5, m: 4 }, { g: 11, m: 5 }, { g: 5, m: 5 }, { g: 5, m: 6 } ],
-    "6": [ { g: 6, m: 1 }, { g: 6, m: 2 }, { g: 6, m: 3 }, { g: 6, m: 4 }, { g: 6, m: 5 }, { g: 11, m: 6 }, { g: 6, m: 6 } ],
-    "7": [ { g: 7, m: 1 }, { g: 7, m: 2 }, { g: 7, m: 3 }, { g: 7, m: 4 }, { g: 12, m: 4 }, { g: 7, m: 5 }, { g: 7, m: 6 } ],
-    "8": [ { g: 8, m: 1 }, { g: 8, m: 2 }, { g: 8, m: 3 }, { g: 12, m: 3 }, { g: 8, m: 4 }, { g: 8, m: 5 }, { g: 8, m: 6 } ],
-    "9": [ { g: 9, m: 1 }, { g: 9, m: 2 }, { g: 12, m: 2 }, { g: 9, m: 3 }, { g: 9, m: 4 }, { g: 9, m: 5 }, { g: 9, m: 6 } ],
-    "10": [ { g: 10, m: 1 }, { g: 12, m: 1 }, { g: 10, m: 2 }, { g: 10, m: 3 }, { g: 10, m: 4 }, { g: 10, m: 5 }, { g: 10, m: 6 } ]
+    "1": [ { g: 11, m: 1 }, { g: 12, m: 1 }, { g: 1, m: 2 }, { g: 4, m: 4 }, { g: 1, m: 4 }, { g: 1, m: 5 } ],
+    "2": [ { g: 2, m: 1 }, { g: 11, m: 2 }, { g: 2, m: 2 }, { g: 2, m: 3 }, { g: 2, m: 4 }, { g: 2, m: 5 }, { g: 12, m: 6 } ],
+    "3": [ { g: 3, m: 1 }, { g: 3, m: 2 }, { g: 11, m: 3 }, { g: 3, m: 3 }, { g: 3, m: 4 }, { g: 3, m: 5 }, { g: 3, m: 6 } ],
+    "4": [ { g: 4, m: 1 }, { g: 4, m: 2 }, { g: 4, m: 3 }, { g: 11, m: 4 }, { g: 5, m: 5 }, { g: 4, m: 5 }, { g: 4, m: 6 } ],
+    "5": [ { g: 5, m: 1 }, { g: 5, m: 2 }, { g: 5, m: 3 }, { g: 5, m: 4 }, { g: 11, m: 5 }, { g: 6, m: 6 }, { g: 5, m: 6 } ],
+    "6": [ { g: 6, m: 1 }, { g: 6, m: 2 }, { g: 6, m: 3 }, { g: 6, m: 4 }, { g: 6, m: 5 }, { g: 11, m: 6 }, { g: 2, m: 6 } ],
+    "7": [ { g: 7, m: 1 }, { g: 7, m: 2 }, { g: 7, m: 3 }, { g: 7, m: 4 }, { g: 12, m: 4 }, { g: 12, m: 5 }, { g: 7, m: 6 } ],
+    "8": [ { g: 8, m: 1 }, { g: 8, m: 2 }, { g: 8, m: 3 }, { g: 12, m: 3 }, { g: 7, m: 5 }, { g: 8, m: 5 }, { g: 8, m: 6 } ],
+    "9": [ { g: 9, m: 1 }, { g: 9, m: 2 }, { g: 12, m: 2 }, { g: 8, m: 4 }, { g: 9, m: 4 }, { g: 9, m: 5 }, { g: 9, m: 6 } ],
+    "10": [ { g: 10, m: 1 }, { g: 10, m: 2 }, { g: 9, m: 3 }, { g: 10, m: 3 }, { g: 10, m: 4 }, { g: 10, m: 5 }, { g: 10, m: 6 } ]
 };
 
 // Assign Matches to Courts
@@ -223,7 +223,7 @@ export const assignMatchesToCourts = (matches, courts) => {
 
                 if (scheduledMatch) {
                     if (scheduledMatch.status !== 'COMPLETED') {
-                        // Found the next required match for this court.
+                        // Priority 1: If ready, assign immediately and move to next court
                         if (scheduledMatch.status === 'PENDING' &&
                             !scheduledMatch.court_id &&
                             !busyTeams.has(scheduledMatch.team_a_id) &&
@@ -231,42 +231,53 @@ export const assignMatchesToCourts = (matches, courts) => {
                             scheduledMatch.team_a_id !== 'TBD' && scheduledMatch.team_a_id !== 'BYE' &&
                             scheduledMatch.team_b_id !== 'TBD' && scheduledMatch.team_b_id !== 'BYE') 
                         {
-                            // Assign
                             scheduledMatch.status = 'LIVE';
                             scheduledMatch.court_id = court.id;
                             court.match_id = scheduledMatch.id;
 
                             busyTeams.add(scheduledMatch.team_a_id);
                             busyTeams.add(scheduledMatch.team_b_id);
-                        }
+                            courtAssigned = true;
+                            break; // Court assigned, stop search for this court
+                        } 
                         
-                        // We strictly block the court with this specific match until it's COMPLETE.
-                        courtAssigned = true;
-                        break;
+                        // Priority 2: If already playing here, mark as assigned and stop
+                        if (scheduledMatch.status === 'LIVE' && scheduledMatch.court_id === court.id) {
+                            courtAssigned = true;
+                            break;
+                        }
+
+                        // Priority 3: If PENDING but NOT READY (busy teams), DO NOT block.
+                        // Instead, continue searching the rest of the fixed queue for this court.
+                        // This avoids idle time if the intended match is waiting for a team.
                     }
                 }
             }
         }
 
-        // 4.2. Fallback to Dynamic Queue (Knockouts) if fixed schedule is completely done or non-existent
+        // 4.2. Fallback to Dynamic Queue (Knockouts OR fully finished containers)
         if (!courtAssigned) {
-            const candidateIndex = pendingKnockoutMatches.findIndex(m =>
+            // Find any match that is ready to play (not blocked by fixed schedule/busy teams)
+            // User said: "If court 1 is finished, fill matches automatically"
+            const candidateIndex = nextMatches.findIndex(m =>
+                m.status === 'PENDING' &&
+                !m.court_id &&
+                m.team_a_id !== 'TBD' && m.team_a_id !== 'BYE' &&
+                m.team_b_id !== 'TBD' && m.team_b_id !== 'BYE' &&
                 !busyTeams.has(m.team_a_id) && !busyTeams.has(m.team_b_id)
             );
 
             if (candidateIndex !== -1) {
-                const match = pendingKnockoutMatches[candidateIndex];
+                const match = nextMatches[candidateIndex];
 
-                const matchInMainList = nextMatches.find(m => m.id === match.id);
-                matchInMainList.status = 'LIVE';
-                matchInMainList.court_id = court.id;
+                match.status = 'LIVE';
+                match.court_id = court.id;
                 
                 court.match_id = match.id;
 
                 busyTeams.add(match.team_a_id);
                 busyTeams.add(match.team_b_id);
-
-                pendingKnockoutMatches.splice(candidateIndex, 1);
+                courtAssigned = true;
             }
         }
     }
@@ -759,21 +770,22 @@ export const generateBracket32 = (top32Teams, groupedStandings) => {
 
 // Auto-advance winners in the knockout stage
 export const updateTournamentProgression = (matches, completedMatchId, winnerId) => {
-    // Deep copy to avoid mutating state directly
     const newMatches = JSON.parse(JSON.stringify(matches));
-
     const completedMatch = newMatches.find(m => m.id === completedMatchId);
-    if (!completedMatch || !completedMatch.next_match_id || !winnerId) {
-        return newMatches; // No advancement needed/possible
-    }
+    
+    // If no match or no next match, nothing to do
+    if (!completedMatch || !completedMatch.next_match_id) return newMatches;
 
     const nextMatch = newMatches.find(m => m.id === completedMatch.next_match_id);
-    if (nextMatch) {
-        if (completedMatch.is_team_a_next) {
-            nextMatch.team_a_id = winnerId;
-        } else {
-            nextMatch.team_b_id = winnerId;
-        }
+    if (!nextMatch) return newMatches;
+
+    // Source of truth for the slot is the winnerId (or TBD if blank)
+    const val = winnerId || 'TBD';
+
+    if (completedMatch.is_team_a_next) {
+        nextMatch.team_a_id = val;
+    } else {
+        nextMatch.team_b_id = val;
     }
 
     return newMatches;

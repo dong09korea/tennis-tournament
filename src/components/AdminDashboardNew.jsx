@@ -715,7 +715,37 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
         }
 
         // Take exactly bucketSize teams for this seed's turn (or fewer if not enough left)
-        const seedTeams = unassignedValidTeams.slice(0, bucketSize);
+        let seedTeams = unassignedValidTeams.slice(0, bucketSize);
+
+        // --- SPECIAL RULE: Force Group 1, Team 1 to be 'Absent' (불참) if Seed 1 lottery is clicked ---
+        if (seedVal === 1) {
+            // Find if there's an 'Absent' team already or create one logically
+            // We'll replace the first team in seedTeams with the "불참" data
+            // BUT we want to make sure it ends up in Group 1.
+            const absentTeam = {
+                originalIdx: -1, // We'll find or hijack an index
+                p1_name: '불참',
+                p2_name: '불참',
+                club: '불참',
+                group: '1조'
+            };
+
+            // Check if there's already a row labeled "불참" in gridData
+            const existingAbsentIdx = gridData.findIndex(r => r.p1_name === '불참' || r.club === '불참');
+            
+            if (existingAbsentIdx !== -1) {
+                absentTeam.originalIdx = existingAbsentIdx;
+                // Remove this specific team from unassigned if it was there
+                seedTeams = seedTeams.filter(t => t.originalIdx !== existingAbsentIdx);
+                // Prepend it so it's handled first
+                seedTeams.unshift({ ...gridData[existingAbsentIdx], originalIdx: existingAbsentIdx });
+            } else {
+                // If no "불참" row exists, hijack the very first unassigned team slot for it
+                const hijacked = seedTeams[0];
+                absentTeam.originalIdx = hijacked.originalIdx;
+                seedTeams[0] = absentTeam;
+            }
+        }
 
         // Group currently assigned teams
         const currentGroups = Array.from({ length: numGroups }, () => []);
@@ -751,6 +781,22 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
 
             // Randomize the order we place the teams in this attempt to avoid getting stuck
             let teamsToAssign = seedTeams.map((t, i) => ({ team: t, origIndex: i }));
+            
+            // --- FIX: PRE-ASSIGN ABSENT TEAM BEFORE ANY OTHER TEAMS ---
+            // Remove the absent team from the pool so no one else can steal Group 1
+            if (seedVal === 1) {
+                const absentTeamIndex = teamsToAssign.findIndex(t => t.origIndex === 0);
+                if (absentTeamIndex !== -1) {
+                    const absentTeamMeta = teamsToAssign.splice(absentTeamIndex, 1)[0];
+                    const targetGIdx = 0;
+                    const sIdx = currentSlots.indexOf(targetGIdx);
+                    if (sIdx !== -1) {
+                        attemptAssignment.push({ origIndex: absentTeamMeta.origIndex, gIdx: targetGIdx });
+                        currentSlots.splice(sIdx, 1);
+                    }
+                }
+            }
+
             for (let i = teamsToAssign.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
                 [teamsToAssign[i], teamsToAssign[j]] = [teamsToAssign[j], teamsToAssign[i]];
@@ -819,18 +865,26 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
 
         // Apply best found assignment. We need to guarantee that teams picked in earlier seeds 
         // ALWAYS have a lower drawOrder than teams picked in later seeds.
-        // We can do this by using the current max drawOrder or a base offset.
-        for (let i = 0; i < seedTeams.length; i++) {
-            const team = seedTeams[i];
-            const bestGIdx = bestAssignment[i];
-            currentGroups[bestGIdx].push(team);
-            newGrid[team.originalIdx].group = `${bestGIdx + 1}조`;
+        
+        // --- FORCE ABSENT TEAM ORDER ---
+        // To ensure the "Absent" team (origIndex === 0) remains the FIRST team in Group 1,
+        // it must have the absolute lowest drawOrder in this seed batch.
+        // We do this by sorting the assignment by origIndex before applying drawOrder.
+        const sortedAssignment = seedTeams.map((t, i) => ({ team: t, gIdx: bestAssignment[i], origIndex: i }));
+        sortedAssignment.sort((a, b) => a.origIndex - b.origIndex);
+
+        for (let i = 0; i < sortedAssignment.length; i++) {
+            const { team, gIdx } = sortedAssignment[i];
+            currentGroups[gIdx].push(team);
+            newGrid[team.originalIdx].group = `${gIdx + 1}조`;
             // Increment drawOrder globally so any team drawn in this bucket gets a higher number 
             // than the previous bucket, but we also sequence them within the bucket so there are no ties.
+            // Since sortedAssignment is sorted by origIndex, the absent team (origIndex 0) gets the lowest drawOrder.
             newGrid[team.originalIdx].drawOrder = ++drawOrderRef.current;
         }
 
         setGridData(newGrid);
+
         if (minConflicts > 0) {
             setStatusMsg(`⚠️ 배정 완료: 클럽 중복을 피할 수 없어 ${minConflicts}건의 중복이 발생했습니다.`);
         } else {
