@@ -1525,6 +1525,11 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                         display: none !important;
                     }
 
+                    /* Hide fixed elements from App.jsx (like the push notification banner) */
+                    div[style*="position: fixed"] {
+                        display: none !important;
+                    }
+
                     /* Reset the layout containers to standard block flow */
                     .dashboard-container, 
                     .dashboard-grid, 
@@ -1551,7 +1556,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
 
                     /* Unset the flex parent container to prevent issues */
                     .main-qr-section, div[style*="marginBottom: 2.5rem"] {
-                        margin: 0 !important;
+                        margin: 0 auto !important;
                         padding: 0 !important;
                         display: block !important;
                         width: 100% !important;
@@ -1562,12 +1567,13 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                         flex-direction: column !important;
                         align-items: center !important;
                         justify-content: center !important;
-                        width: 210mm !important; /* A4 Width */
-                        height: 297mm !important; /* A4 Height */
+                        width: 100% !important; /* Take full available width for perfect flex centering */
+                        height: 260mm !important; /* Safe height to prevent 2nd blank page overflow */
+                        max-width: none !important; /* Override screen max-width */
                         page-break-after: always !important;
                         page-break-inside: avoid !important;
                         margin: 0 !important;
-                        padding: 20mm !important;
+                        padding: 0 !important;
                         background: white !important;
                         border: none !important;
                         box-shadow: none !important;
@@ -1576,17 +1582,19 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                     }
 
                     .qr-card h4 {
-                        font-size: 4.5rem !important;
-                        margin: 0 0 20mm 0 !important;
+                        font-size: 3.5rem !important; /* Reduced size */
+                        margin: 0 0 15mm 0 !important;
                         color: black !important;
                         text-align: center !important;
                         font-weight: 800 !important;
+                        width: 100% !important;
                     }
 
                     /* Make the main QR title slightly smaller to prevent huge multi-line wrapping */
                     .qr-card h4.main-qr-title {
-                        font-size: 3rem !important;
+                        font-size: 2.5rem !important; /* Smaller size for single line */
                         line-height: 1.2 !important;
+                        margin-bottom: 20mm !important;
                     }
 
                     .qr-wrapper {
@@ -1599,13 +1607,13 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                     }
 
                     .qr-wrapper svg {
-                        width: 140mm !important;
-                        height: 140mm !important;
+                        width: 100mm !important; /* Make QR codes smaller! */
+                        height: 100mm !important;
                     }
 
                     .qr-url {
                         display: block !important;
-                        font-size: 1.8rem !important;
+                        font-size: 1.5rem !important; /* Reduced size */
                         font-weight: bold !important;
                         color: black !important;
                         margin-top: 5mm !important;
@@ -1614,10 +1622,11 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                     }
 
                     p[style*="color: #aaa"], .qr-desc {
-                        font-size: 1.2rem !important;
-                        color: #333 !important;
+                        font-size: 1rem !important; /* Reduced size */
+                        color: #555 !important;
                         margin-top: 5mm !important;
                         text-align: center !important;
+                        width: 100% !important;
                     }
                 }
 
