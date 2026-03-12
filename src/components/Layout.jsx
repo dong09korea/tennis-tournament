@@ -29,6 +29,12 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
         >
           순위표
         </button>
+        <button
+          className={`tab-btn ${activeTab === 'lucky' ? 'active' : ''}`}
+          onClick={() => onTabChange('lucky')}
+        >
+          당신의 행운은?
+        </button>
       </nav>
 
       <main className="app-main">

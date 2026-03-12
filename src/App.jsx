@@ -4,6 +4,7 @@ import Bracket from './components/BracketFixed';
 import Standings from './components/Standings';
 import AdminDashboard from './components/AdminDashboardNew';
 import SplashScreen from './components/SplashScreen';
+import LuckyDraw from './components/LuckyDraw';
 
 import { subscribeToData, uploadData, updateCourt, updateMatch, updateTeam } from './services/firebase';
 import {
@@ -708,6 +709,10 @@ function App() {
                             }
                         }}
                     />
+                </div>
+
+                <div style={{ display: activeTab === 'lucky' ? 'block' : 'none' }}>
+                    <LuckyDraw />
                 </div>
 
                 <style>{`
