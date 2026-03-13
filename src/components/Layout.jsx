@@ -35,6 +35,13 @@ const Layout = ({ children, activeTab, onTabChange, isAdmin, onToggleAdmin }) =>
         >
           당신의 행운은?
         </button>
+        <button
+          className={`tab-btn ${activeTab === 'simulator' ? 'active' : ''}`}
+          onClick={() => onTabChange('simulator')}
+          style={{ borderColor: 'rgba(213,255,0,0.3)', color: activeTab === 'simulator' ? undefined : '#d5ff00' }}
+        >
+          🧪 시뮬레이터
+        </button>
       </nav>
 
       <main className="app-main">

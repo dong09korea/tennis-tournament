@@ -15,7 +15,7 @@ const LuckyDraw = () => {
     { num: 51, name: "조병규" }, { num: 52, name: "홍은주" }, { num: 53, name: "김종형" }, { num: 54, name: "김혜지" }, { num: 55, name: "정석연" },
     { num: 56, name: "송다혜" }, { num: 57, name: "김병현" }, { num: 58, name: "조은나" }, { num: 59, name: "정대현" }, { num: 60, name: "김선경" },
     { num: 61, name: "김상민" }, { num: 62, name: "서현주" }, { num: 63, name: "박찬주" }, { num: 64, name: "박성은" }, { num: 65, name: "홍진일" },
-    { num: 66, name: "이지연" }, { num: 67, name: "박주연" }, { num: 68, name: "오진주" }, { num: 69, name: "고용우" }, { num: 70, name: "배서연" },
+    { num: 66, name: "이지연" }, { num: 67, name: "박주연" }, { num: 68, name: "오진주" }, { num: 69, name: "고용우" }, { num: 70, name: "강예원" },
     { num: 71, name: "김수정" }, { num: 72, name: "주혜령" }, { num: 73, name: "김동호" }, { num: 74, name: "나츠미" }, { num: 75, name: "오창현" },
     { num: 76, name: "김은하" }, { num: 77, name: "홍민우" }, { num: 78, name: "김한나" }, { num: 79, name: "이정우" }, { num: 80, name: "박미영" },
     { num: 81, name: "곽남기" }, { num: 82, name: "박선영" }, { num: 83, name: "문기우" }, { num: 84, name: "권주연" }, { num: 85, name: "박종호" },

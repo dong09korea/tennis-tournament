@@ -1,0 +1,13 @@
+--- Group 3 Teams ---
+ID: t19, Name: 김수정/주혜령, Club: '늘찬', Group: 3조
+ID: t30, Name: 홍민우/김한나, Club: '에스원', Group: 3조
+ID: t36, Name: 김세호/김한나, Club: 'SKTC', Group: 3조
+ID: t5, Name: 박종호/이혜연, Club: '라켓업', Group: 3조
+
+--- Group 3 Matches ---
+Match g3_m1: 박종호/이혜연 vs 홍민우/김한나, Status: COMPLETED, Score: 6:2
+Match g3_m2: 김수정/주혜령 vs 김세호/김한나, Status: COMPLETED, Score: 6:4
+Match g3_m3: 박종호/이혜연 vs 김수정/주혜령, Status: COMPLETED, Score: 6:1
+Match g3_m4: 홍민우/김한나 vs 김세호/김한나, Status: COMPLETED, Score: 4:6
+Match g3_m5: 홍민우/김한나 vs 김수정/주혜령, Status: COMPLETED, Score: 6:5
+Match g3_m6: 박종호/이혜연 vs 김세호/김한나, Status: COMPLETED, Score: 5:5

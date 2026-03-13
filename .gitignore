@@ -30,3 +30,6 @@ tournament_data.json
 # Python
 __pycache__/
 *.pyc
+
+.vercel
+.env*.local

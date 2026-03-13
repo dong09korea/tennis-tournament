@@ -173,14 +173,14 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
           조별 순위
         </button>
         <button className={`st-tab ${viewMode === 'wildcard' ? 'active' : ''}`} onClick={() => setViewMode('wildcard')}>
-          와일드카드 순위
+          조 3위 순위
         </button>
       </div>
 
       {/* Legend */}
       <div className="standings-legend">
         <span className="legend-dot direct" />본선 직행 (조 1·2위)
-        <span className="legend-dot wild" />와일드카드 (조 3위 상위 8팀)
+        <span className="legend-dot wild" />조 3위 (본선 진출 상위 8팀)
       </div>
 
       {groupNames.length === 0 && (
@@ -350,8 +350,9 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
               if (b.wins !== a.wins) return b.wins - a.wins;
               if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
 
-              const ageA = parseInt(a.tiebreakAge) || parseInt(a.age) || 0;
-              const ageB = parseInt(b.tiebreakAge) || parseInt(b.age) || 0;
+              // 나이 타이브레이커: 동점 시 관리자가 직접 입력한 tiebreakAge만 사용
+              const ageA = parseInt(a.tiebreakAge) || 0;
+              const ageB = parseInt(b.tiebreakAge) || 0;
               if (ageB !== ageA) return ageB - ageA;
 
               return (a.name || '').localeCompare(b.name || '');
@@ -440,9 +441,9 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                   </div>
                   <div className="sc-stat">{played}</div>
                   <div className="sc-stat col-pts" style={{ color: '#d5ff00', fontWeight: 700 }}>{pts}</div>
-                  <div className="sc-stat" style={{ color: wins > 0 ? '#a8e063' : '#666' }}>{wins}</div>
-                  <div className="sc-stat" style={{ color: draws > 0 ? '#88aaff' : '#666' }}>{draws}</div>
-                  <div className="sc-stat" style={{ color: losses > 0 ? '#ff7070' : '#666' }}>{losses}</div>
+                  <div className="sc-stat" style={{ color: (team.wins || 0) > 0 ? '#a8e063' : '#666' }}>{team.wins || 0}</div>
+                  <div className="sc-stat" style={{ color: (team.draws || 0) > 0 ? '#88aaff' : '#666' }}>{team.draws || 0}</div>
+                  <div className="sc-stat" style={{ color: (team.losses || 0) > 0 ? '#ff7070' : '#666' }}>{team.losses || 0}</div>
                   <div className="sc-stat col-gd" style={{ color: goalDiff > 0 ? '#ff9b55' : (goalDiff < 0 ? '#ff5555' : '#888') }}>
                     {goalDiff > 0 ? `+${goalDiff}` : goalDiff}
                   </div>

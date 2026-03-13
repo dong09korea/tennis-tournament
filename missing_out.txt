@@ -1,0 +1,8 @@
+--- Missing teams from Top 32 ---
+- 남경천/우지영 (t16) : 3위 in group 11
+- 오진우/김관희 (t2) : 3위 in group 1
+- 박상혁/유미숙 (t8) : 3위 in group 6
+- 김수정/주혜령 (t19) : 3위 in group 3
+
+--- Duplicate teams in ko32 ---
+- 김병현/조은나 (t40) appears 2 times

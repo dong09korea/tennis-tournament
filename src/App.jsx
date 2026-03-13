@@ -5,6 +5,7 @@ import Standings from './components/Standings';
 import AdminDashboard from './components/AdminDashboardNew';
 import SplashScreen from './components/SplashScreen';
 import LuckyDraw from './components/LuckyDraw';
+import SimulatorTab from './components/SimulatorTab';
 
 import { subscribeToData, uploadData, updateCourt, updateMatch, updateTeam } from './services/firebase';
 import {
@@ -231,6 +232,31 @@ function App() {
             const bracketShellExists = newData.matches.some(m => m.group_id === '본선 32강');
 
             if (groupMatches.length > 0 && newData.teams) {
+                // 1. Auto-heal Absent matches (ensure they are COMPLETED so wildcards can populate)
+                const matchesToHeal = newData.matches.filter(m => {
+                    if (m.status === 'COMPLETED') return false;
+                    const tA = newData.teams.find(t => t.id === m.team_a_id);
+                    const tB = newData.teams.find(t => t.id === m.team_b_id);
+                    const isAbsentA = tA?.club === '불참' || tA?.name?.includes('불참');
+                    const isAbsentB = tB?.club === '불참' || tB?.name?.includes('불참');
+                    return (isAbsentA || isAbsentB);
+                });
+                if (matchesToHeal.length > 0) {
+                    matchesToHeal.forEach(async m => {
+                        const tA = newData.teams.find(t => t.id === m.team_a_id);
+                        const tB = newData.teams.find(t => t.id === m.team_b_id);
+                        const isAbsentA = tA?.club === '불참' || tA?.name?.includes('불참');
+                        let updates = { status: 'COMPLETED' };
+                        if (isAbsentA) {
+                            updates.score_a = 0; updates.score_b = 6; updates.winner_id = m.team_b_id;
+                        } else {
+                            updates.score_a = 6; updates.score_b = 0; updates.winner_id = m.team_a_id;
+                        }
+                        await updateMatch(m.id, updates);
+                        console.log(`[AutoHeal] Absent match ${m.id} → 6:0`);
+                    });
+                }
+
                 const anyGroupCompleted = (() => {
                     // Check if at least one full group (all its matches) is completed
                     const byGrp = {};
@@ -336,6 +362,30 @@ function App() {
                             }
                         });
 
+                        // Build a set of all team IDs that are already confirmed in a non-wildcard (1위/2위) slot.
+                        // If a team appears in a wildcard slot AND a confirmed slot, it must be evicted
+                        // from the wildcard slot (set back to TBD). This prevents the "ghost duplicate" bug
+                        // where a team temporarily ranked 3rd was placed as a wildcard, then later climbed
+                        // to 1st/2nd — but the wildcard slot was never cleared.
+                        const confirmedNonWildcardTeams = new Set();
+                        updatedMatches.forEach(match => {
+                            if (match.group_id !== '본선 32강') return;
+                            const idx = parseInt(match.id.replace('ko32_m', '')) - 1;
+                            if (isNaN(idx) || idx < 0 || idx > 15) return;
+                            const def = FIXED_BRACKET_LAYOUT[idx];
+                            if (!def) return;
+                            // Check side A: if it's a confirmed (non-W) slot and team is known, remember it
+                            if (def.a.g !== 'W') {
+                                const tid = rankMap[def.a.g]?.[def.a.rank];
+                                if (tid) confirmedNonWildcardTeams.add(tid);
+                            }
+                            // Check side B
+                            if (def.b.g !== 'W') {
+                                const tid = rankMap[def.b.g]?.[def.b.rank];
+                                if (tid) confirmedNonWildcardTeams.add(tid);
+                            }
+                        });
+
                         let changed = false;
                         updatedMatches = updatedMatches.map((match, _) => {
                             if (match.group_id !== '본선 32강') return match;
@@ -350,7 +400,15 @@ function App() {
                             if (m.status === 'PENDING') {
                                 // Side A
                                 if (def.a.g === 'W') {
-                                    // Manually controlled by Standings.jsx 'onPushWildcardsToBracket' button
+                                    // ── Ghost eviction: if the wildcard slot holds a team that is now
+                                    // confirmed in a regular (1위/2위) slot, clear it back to TBD so the
+                                    // real wildcard team (or a re-run of onPushWildcardsToBracket) can fill it.
+                                    if (m.team_a_id && m.team_a_id !== 'TBD' && m.team_a_id !== 'BYE'
+                                        && confirmedNonWildcardTeams.has(m.team_a_id)) {
+                                        console.log(`[GhostEvict] ko32_m${idx+1} side A: evicting ${m.team_a_id} from wildcard slot → TBD`);
+                                        m.team_a_id = 'TBD'; changed = true;
+                                    }
+                                    // Otherwise leave wildcard slots for manual button
                                 } else {
                                     const tid = rankMap[def.a.g]?.[def.a.rank];
                                     if (tid && m.team_a_id !== tid) {
@@ -360,7 +418,13 @@ function App() {
 
                                 // Side B
                                 if (def.b.g === 'W') {
-                                    // Manually controlled by Standings.jsx 'onPushWildcardsToBracket' button
+                                    // ── Ghost eviction for side B ──
+                                    if (m.team_b_id && m.team_b_id !== 'TBD' && m.team_b_id !== 'BYE'
+                                        && confirmedNonWildcardTeams.has(m.team_b_id)) {
+                                        console.log(`[GhostEvict] ko32_m${idx+1} side B: evicting ${m.team_b_id} from wildcard slot → TBD`);
+                                        m.team_b_id = 'TBD'; changed = true;
+                                    }
+                                    // Otherwise leave wildcard slots for manual button
                                 } else {
                                     const tid = rankMap[def.b.g]?.[def.b.rank];
                                     if (tid && m.team_b_id !== tid) {
@@ -387,6 +451,39 @@ function App() {
                                 await Promise.all(promises);
                                 console.log(`✅ 32강 슬롯 ${promises.length}개 업데이트 완료`);
                             }
+                        }
+
+                        // ── Self-Healing Knockout Progression (32 -> 16 -> 8 -> 4 -> Final) ──
+                        const syncPromises = [];
+                        const kGroups = ['본선 32강', '본선 16강', '본선 8강', '본선 4강', '본선 결승', '16강', '8강', '4강', '결승', '본선 16강 (무작위)'];
+                        fd.matches.filter(m => kGroups.includes(m.group_id) && m.next_match_id).forEach(m => {
+                            const nextMatch = fd.matches.find(nm => nm.id === m.next_match_id);
+                            if (!nextMatch) return;
+
+                            // Expected winner
+                            let expectedWinner = 'TBD';
+                            if (m.status === 'COMPLETED') {
+                                if (m.winner_id) {
+                                    expectedWinner = m.winner_id;
+                                } else {
+                                    // Robust fallback: re-calculate winner if explicitly completed
+                                    if (m.score_a > m.score_b) expectedWinner = m.team_a_id;
+                                    else if (m.score_b > m.score_a) expectedWinner = m.team_b_id;
+                                    else if (m.team_a_id === 'BYE') expectedWinner = m.team_b_id;
+                                    else if (m.team_b_id === 'BYE') expectedWinner = m.team_a_id;
+                                    // if still not found, stays TBD
+                                }
+                            }
+
+                            const slot = m.is_team_a_next ? 'team_a_id' : 'team_b_id';
+                            if (nextMatch[slot] !== expectedWinner) {
+                                console.log(`[SelfHeal] Syncing match ${nextMatch.id} slot ${slot} -> ${expectedWinner}`);
+                                syncPromises.push(updateMatch(nextMatch.id, { [slot]: expectedWinner }));
+                            }
+                        });
+
+                        if (syncPromises.length > 0) {
+                            await Promise.all(syncPromises);
                         }
                     }, 1200);
                 }
@@ -713,6 +810,10 @@ function App() {
 
                 <div style={{ display: activeTab === 'lucky' ? 'block' : 'none' }}>
                     <LuckyDraw />
+                </div>
+
+                <div style={{ display: activeTab === 'simulator' ? 'block' : 'none' }}>
+                    <SimulatorTab realTeams={data.teams} />
                 </div>
 
                 <style>{`

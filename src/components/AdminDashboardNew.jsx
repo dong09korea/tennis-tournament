@@ -112,6 +112,71 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
         XLSX.writeFile(wb, "tennis_teams_template.xlsx");
     };
 
+    const handleDownloadFullBracketExcel = () => {
+        if (!data || !data.teams || !data.matches) {
+            alert("대회 데이터가 없습니다.");
+            return;
+        }
+
+        const wb = XLSX.utils.book_new();
+
+        // 1. 조 편성표
+        const groupData = gridData.filter(r => r.p1_name || r.club).map(r => ({
+            '조': r.group,
+            '참가자A': r.p1_name,
+            '참가자B': r.p2_name,
+            '클럽': r.club
+        })).sort((a, b) => {
+            const numA = parseInt(a['조']) || 0;
+            const numB = parseInt(b['조']) || 0;
+            return numA - numB;
+        });
+
+        if (groupData.length > 0) {
+            const wsGroups = XLSX.utils.json_to_sheet(groupData);
+            XLSX.utils.book_append_sheet(wb, wsGroups, "조 편성표");
+        }
+
+        // 2. 대진표 결과
+        const getTeamName = (id) => {
+            if (!id) return '';
+            if (id === 'BYE') return '부전승 (BYE)';
+            const t = data.teams.find(t => t.id === id);
+            return t ? t.name : id;
+        };
+
+        const exportMatches = data.matches.map(m => {
+            const isGroup = typeof m.group_id === 'number' || (typeof m.group_id === 'string' && m.group_id.includes('조'));
+            return {
+                '구분': isGroup ? '예선 조별리그' : m.group_id,
+                '매치번호': m.id,
+                '팀A': getTeamName(m.team_a_id),
+                '팀B': getTeamName(m.team_b_id),
+                '점수A': m.score_a ?? '-',
+                '점수B': m.score_b ?? '-',
+                '승리팀': getTeamName(m.winner_id),
+                '상태': m.status === 'COMPLETED' ? '완료' : m.status === 'LIVE' ? '진행중' : '대기'
+            };
+        }).sort((a, b) => {
+            return a['매치번호'].localeCompare(b['매치번호'], undefined, {numeric: true});
+        });
+
+        const groupMatches = exportMatches.filter(m => m['구분'] === '예선 조별리그');
+        const knockoutMatches = exportMatches.filter(m => m['구분'] !== '예선 조별리그' && m['구분'] !== 'settings');
+
+        if (groupMatches.length > 0) {
+            const wsGroupMatches = XLSX.utils.json_to_sheet(groupMatches);
+            XLSX.utils.book_append_sheet(wb, wsGroupMatches, "예선 경기");
+        }
+
+        if (knockoutMatches.length > 0) {
+            const wsKnockout = XLSX.utils.json_to_sheet(knockoutMatches);
+            XLSX.utils.book_append_sheet(wb, wsKnockout, "본선 대진표");
+        }
+        
+        XLSX.writeFile(wb, "테니스대회_전체대진표.xlsx");
+    };
+
     const handleExcelUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
@@ -204,8 +269,8 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                 const teamA = teams.find(t => t.id === m.team_a_id);
                 const teamB = teams.find(t => t.id === m.team_b_id);
                 
-                const isAbsentA = teamA && (teamA.name.includes("불참") || teamA.club === "불참");
-                const isAbsentB = teamB && (teamB.name.includes("불참") || teamB.club === "불참");
+                const isAbsentA = teamA && (teamA.name.includes("불참") || teamA.club === "불참" || teamA.name === "1조 1번팀");
+                const isAbsentB = teamB && (teamB.name.includes("불참") || teamB.club === "불참" || teamB.name === "1조 1번팀");
                 
                 if (isAbsentA || isAbsentB) {
                     m.status = 'COMPLETED';
@@ -942,6 +1007,153 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
         }
     };
 
+    // ── 16강 일괄 코트 배정 ─────────────────────────────────────────────────
+    // 32강이 모두 끝난 후 브레이크타임을 마치고 관리자가 이 버튼을 누르면
+    // 16강 전 경기를 빈 코트에 일제히 배정합니다.
+    const handleStart16Kang = async () => {
+        if (!data || !data.matches || !data.courts) return;
+
+        const ko16Matches = data.matches.filter(m =>
+            m.group_id === '본선 16강' &&
+            m.status === 'PENDING' &&
+            !m.court_id &&
+            m.team_a_id !== 'TBD' && m.team_a_id !== 'BYE' &&
+            m.team_b_id !== 'TBD' && m.team_b_id !== 'BYE'
+        );
+
+        if (ko16Matches.length === 0) {
+            alert('배정할 16강 경기가 없습니다.\n(대진표에 TBD가 남아있거나 이미 배정된 상태입니다.)');
+            return;
+        }
+
+        const emptyCourts = data.courts
+            .filter(c => {
+                if (!c.match_id) return true;
+                const linked = data.matches.find(m => m.id === c.match_id);
+                return !linked || linked.status !== 'LIVE';
+            })
+            .sort((a, b) => a.id - b.id);
+
+        if (emptyCourts.length === 0) {
+            alert('빈 코트가 없습니다. 진행 중인 경기가 모두 끝난 뒤 다시 시도하세요.');
+            return;
+        }
+
+        if (!confirm(`16강 ${ko16Matches.length}경기를 ${emptyCourts.length}개 빈 코트에 일괄 배정하시겠습니까?\n브레이크타임이 끝난 후 눌러주세요!`)) return;
+
+        setIsProcessing(true);
+        setStatusMsg('16강 코트 배정 중...');
+        try {
+            const sortedMatches = [...ko16Matches].sort((a, b) => a.round - b.round);
+            const busyTeams = new Set(
+                data.matches.filter(m => m.status === 'LIVE')
+                    .flatMap(m => [m.team_a_id, m.team_b_id])
+            );
+
+            const promises = [];
+            let courtIdx = 0;
+            for (const match of sortedMatches) {
+                if (courtIdx >= emptyCourts.length) break;
+                if (busyTeams.has(match.team_a_id) || busyTeams.has(match.team_b_id)) continue;
+
+                const court = emptyCourts[courtIdx++];
+                busyTeams.add(match.team_a_id);
+                busyTeams.add(match.team_b_id);
+
+                promises.push(updateMatch(match.id, { status: 'LIVE', court_id: court.id }));
+                promises.push(updateCourt(court.id, { match_id: match.id }));
+            }
+
+            if (promises.length === 0) {
+                alert('배정 가능한 경기가 없습니다. 팀 중복이나 코트 상태를 확인해주세요.');
+                setIsProcessing(false);
+                return;
+            }
+
+            await Promise.all(promises);
+            setStatusMsg(`✅ 16강 ${promises.length / 2}경기 코트 배정 완료!`);
+            setTimeout(() => setStatusMsg(''), 4000);
+        } catch (e) {
+            console.error(e);
+            setStatusMsg('❌ 오류: ' + e.message);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    // ── 점수 전체 리셋 (참가자·조·대진 유지) ────────────────────────────────
+    // 모든 경기의 점수/상태만 초기화. 팀 편성·대진표 구조는 절대 변경 안 함.
+    const handleScoreReset = async () => {
+        if (!data || !data.matches) return;
+
+        const confirmed = window.confirm(
+            '⚠️ 점수 전체 리셋\n\n' +
+            '• 참가자, 조 편성, 대진표 구조는 유지됩니다.\n' +
+            '• 모든 경기 점수, 경기 상태, 코트 배정이 초기화됩니다.\n' +
+            '• 본선(32강~결승) 슬롯은 TBD로 돌아갑니다.\n\n' +
+            '계속하시겠습니까?'
+        );
+        if (!confirmed) return;
+
+        setIsProcessing(true);
+        setStatusMsg('점수 리셋 중...');
+        try {
+            const isGroupMatch = (m) =>
+                typeof m.group_id === 'number' ||
+                (typeof m.group_id === 'string' && (m.group_id.includes('조') || /^\d+$/.test(m.group_id)));
+
+            const knockoutGroups = new Set(['본선 32강', '본선 16강', '본선 8강', '본선 4강', '본선 결승',
+                '16강', '8강', '4강', '결승', '본선 16강 (무작위)']);
+
+            const promises = [];
+
+            data.matches.forEach(m => {
+                if (isGroupMatch(m)) {
+                    // 예선: 점수·상태만 초기화, 팀은 그대로
+                    promises.push(updateMatch(m.id, {
+                        score_a: null,
+                        score_b: null,
+                        tb_score_a: null,
+                        tb_score_b: null,
+                        status: 'PENDING',
+                        winner_id: null,
+                        court_id: null
+                    }));
+                } else if (knockoutGroups.has(m.group_id)) {
+                    // 본선: 점수·상태 초기화 + TBD로 슬롯 비우기
+                    promises.push(updateMatch(m.id, {
+                        score_a: null,
+                        score_b: null,
+                        tb_score_a: null,
+                        tb_score_b: null,
+                        status: 'PENDING',
+                        winner_id: null,
+                        court_id: null,
+                        team_a_id: 'TBD',
+                        team_b_id: 'TBD'
+                    }));
+                }
+            });
+
+            // 모든 코트 비우기
+            data.courts.forEach(c => {
+                promises.push(updateCourt(c.id, { match_id: null }));
+            });
+
+            await Promise.all(promises);
+
+            // 32강 고정 대진 슬롯 복원 (FIXED_BRACKET_LAYOUT 기반으로 1위/2위 슬롯 팀 재배정)
+            // → App.jsx의 자동 채우기가 다음 렌더에서 처리해줌 (fillBracket32Slots)
+            setStatusMsg('✅ 점수 리셋 완료! 예선부터 다시 시작하세요.');
+            setTimeout(() => setStatusMsg(''), 5000);
+        } catch (e) {
+            console.error(e);
+            setStatusMsg('❌ 오류: ' + e.message);
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
     // --- LOGIN VIEW ---
     if (!isAdmin) {
         return (
@@ -1049,8 +1261,9 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                 className="modern-button secondary"
                                                 onClick={handleSmartAssign}
                                                 title="클럽 분산 무작위 자동 배정"
+                                                disabled={true}
                                             >
-                                                🔀 조 구성 셔플 배정
+                                                🔀 조 구성 셔플 배정 (완료됨)
                                             </button>
                                         </div>
                                         <p className="field-hint">전체 참가팀을 나눌 조의 개수입니다.</p>
@@ -1072,34 +1285,26 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                     <div className="excel-actions">
                                         <button
                                             className="mini-btn"
-                                            style={{ backgroundColor: '#ff9800', color: 'white' }}
+                                            style={{ backgroundColor: '#ff9800', color: 'white', opacity: 0.5, cursor: 'not-allowed' }}
                                             onClick={handleSmartAssign}
+                                            disabled={true}
                                         >
-                                            🔀 조 구성 다시하기 (클럽분산)
+                                            🔀 조 구성 다시하기 (마감됨)
                                         </button>
                                         <button onClick={handleExcelDownload} className="mini-btn success">📥 엑셀 양식 다운</button>
-                                        <label className="mini-btn info" style={{ cursor: 'pointer' }}>
-                                            📤 엑셀 업로드
-                                            <input type="file" accept=".xlsx, .xls" onChange={handleExcelUpload} style={{ display: 'none' }} />
+                                        <label className="mini-btn info" style={{ cursor: 'not-allowed', opacity: 0.5 }}>
+                                            📤 엑셀 업로드 (마감됨)
+                                            <input type="file" disabled={true} accept=".xlsx, .xls" onChange={handleExcelUpload} style={{ display: 'none' }} />
                                         </label>
                                         <button 
                                             onClick={async () => {
-                                                if (confirm("🚨 경고: 서버의 모든 대회 데이터를 '강제'로 삭제하시겠습니까?\n이 작업은 되돌릴 수 없으며, 통신 오류를 해결하기 위해 사용합니다.")) {
-                                                    setIsProcessing(true);
-                                                    try {
-                                                        await resetTournamentData();
-                                                        alert("🧹 서버 데이터가 깨끗하게 비워졌습니다. 이제 다시 생성해보세요.");
-                                                        window.location.reload(); // Force reload to be sure
-                                                    } catch (e) {
-                                                        alert("초기화 실패: " + e.message);
-                                                    }
-                                                    setIsProcessing(false);
-                                                }
+                                                alert("현재 대회 조 편성이 마감되어 강제 초기화를 사용할 수 없습니다.");
                                             }}
                                             className="mini-btn danger"
-                                            style={{ marginLeft: '10px' }}
+                                            style={{ marginLeft: '10px', opacity: 0.5, cursor: 'not-allowed' }}
+                                            disabled={true}
                                         >
-                                            ☢️ 서버 강제 초기화
+                                            ☢️ 서버 강제 초기화 (마감됨)
                                         </button>
                                     </div>
                                 </div>
@@ -1116,10 +1321,10 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                         {gridData.map((row, idx) => (
                                             <div key={idx} className="grid-row">
                                                 <div className="gc-cell w-num">{idx + 1}</div>
-                                                <input type="text" className="gc-input w-group" placeholder="조" value={row.group} onChange={(e) => handleGridChange(idx, 'group', e.target.value)} />
-                                                <input type="text" className="gc-input w-name" placeholder="참가자A" value={row.p1_name} onChange={(e) => handleGridChange(idx, 'p1_name', e.target.value)} />
-                                                <input type="text" className="gc-input w-name" placeholder="참가자B" value={row.p2_name} onChange={(e) => handleGridChange(idx, 'p2_name', e.target.value)} />
-                                                <input type="text" className="gc-input w-club" placeholder="클럽" value={row.club} onChange={(e) => handleGridChange(idx, 'club', e.target.value)} />
+                                                <input type="text" className="gc-input w-group" placeholder="조" value={row.group} disabled={true} onChange={(e) => handleGridChange(idx, 'group', e.target.value)} />
+                                                <input type="text" className="gc-input w-name" placeholder="참가자A" value={row.p1_name} disabled={true} onChange={(e) => handleGridChange(idx, 'p1_name', e.target.value)} />
+                                                <input type="text" className="gc-input w-name" placeholder="참가자B" value={row.p2_name} disabled={true} onChange={(e) => handleGridChange(idx, 'p2_name', e.target.value)} />
+                                                <input type="text" className="gc-input w-club" placeholder="클럽" value={row.club} disabled={true} onChange={(e) => handleGridChange(idx, 'club', e.target.value)} />
                                             </div>
                                         ))}
                                     </div>
@@ -1184,10 +1389,10 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                     <button
                                         className="modern-button danger"
                                         onClick={handleReset}
-                                        disabled={isProcessing}
-                                        style={{ width: 'auto' }}
+                                        disabled={true}
+                                        style={{ width: 'auto', opacity: 0.5, cursor: 'not-allowed' }}
                                     >
-                                        🗑️ 초기화
+                                        🗑️ 초기화 (조 확정)
                                     </button>
 
                                 </div>
@@ -1204,12 +1409,12 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
 
                                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', margin: '15px 0 25px 0' }}>
                                     {[1, 2, 3, 4].map(s => (
-                                        <button key={s} className="modern-button secondary" onClick={() => handleSeedLottery(s)} style={{ padding: '0.6rem 1rem', fontSize: '0.9rem' }}>
-                                            🎱 시드 {s} 추첨
+                                        <button key={s} className="modern-button secondary" onClick={() => handleSeedLottery(s)} disabled={true} style={{ padding: '0.6rem 1rem', fontSize: '0.9rem', opacity: 0.5, cursor: 'not-allowed' }}>
+                                            🎱 시드 {s} 추첨 (마감됨)
                                         </button>
                                     ))}
-                                    <button className="modern-button danger" onClick={handleClearGroups} style={{ padding: '0.6rem 1rem', fontSize: '0.9rem', flex: 'none', marginLeft: 'auto' }}>
-                                        🧹 조 배정 초기화
+                                    <button className="modern-button danger" onClick={handleClearGroups} disabled={true} style={{ padding: '0.6rem 1rem', fontSize: '0.9rem', flex: 'none', marginLeft: 'auto', opacity: 0.5, cursor: 'not-allowed' }}>
+                                        🧹 조 배정 초기화 (마감됨)
                                     </button>
                                 </div>
 
@@ -1313,8 +1518,12 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                         {/* TAB 4: MATCH MANAGEMENT */}
                         {activeTab === 'manage' && (
                             <div className="tab-content fade-in">
-                                <div className="card-header">
+                                <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                     <h3><span className="icon-gap">🎾</span> 경기 결과 관리</h3>
+                                    <button onClick={handleDownloadFullBracketExcel} className="mini-btn success">
+                                        📊 전체 대진표 엑셀 다운
+                                    </button>
+                                </div>
 
                                     {/* ── 시뮬레이션 패널 ── */}
                                     {data?.courts?.some(c => c.match_id) && (
@@ -1390,16 +1599,35 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                         const match = data.matches.find(m => m.id === court.match_id);
                                                         const teamA = data.teams.find(t => t.id === match.team_a_id);
                                                         const teamB = data.teams.find(t => t.id === match.team_b_id);
-                                                        const label = `${court.id}코트: ${teamA?.name?.split('/')[0] || '?'} vs ${teamB?.name?.split('/')[0] || '?'}`;
+                                                        const isGroupMatch = typeof match.group_id === 'number' || (typeof match.group_id === 'string' && (match.group_id.includes('조') || /^\d+$/.test(String(match.group_id))));
+                                                        const groupLabel = isGroupMatch
+                                                            ? `${match.group_id} · ${match.match_in_group || match.round}번째 경기`
+                                                            : `${match.group_id} R${match.round}`;
+                                                        const teamAName = teamA?.name || '?';
+                                                        const teamBName = teamB?.name || '?';
                                                         return (
                                                             <div key={court.id} style={{
                                                                 background: 'rgba(0,0,0,0.3)',
                                                                 borderRadius: '10px',
                                                                 padding: '0.6rem 0.9rem',
                                                                 border: '1px solid #444',
-                                                                minWidth: '200px'
+                                                                minWidth: '240px',
+                                                                maxWidth: '320px'
                                                             }}>
-                                                                <div style={{ fontSize: '0.78rem', color: '#ccc', marginBottom: '6px' }}>{label}</div>
+                                                                {/* 코트 번호 + 조/경기 정보 */}
+                                                                <div style={{ fontSize: '0.72rem', color: '#d5ff00', fontWeight: 700, marginBottom: '2px' }}>
+                                                                    🎾 {court.id}번 코트 &nbsp;·&nbsp; {groupLabel}
+                                                                </div>
+                                                                {/* 팀A 전체 이름 */}
+                                                                <div style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 700, marginBottom: '1px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                    🔴 {teamAName}
+                                                                </div>
+                                                                {/* vs */}
+                                                                <div style={{ fontSize: '0.7rem', color: '#555', margin: '1px 0', textAlign: 'center' }}>vs</div>
+                                                                {/* 팀B 전체 이름 */}
+                                                                <div style={{ fontSize: '0.85rem', color: '#fff', fontWeight: 700, marginBottom: '6px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                                                    🔵 {teamBName}
+                                                                </div>
                                                                 <div style={{ display: 'flex', gap: '5px', flexWrap: 'wrap' }}>
                                                                     <button
                                                                         onClick={async () => {
@@ -1444,7 +1672,6 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                             </div>
                                         </div>
                                     )}
-                                </div>
                                 <p className="card-desc">운영자가 직접 점수(+/-)나 경기 상태를 변경할 수 있습니다. 변경된 점수는 대진표 모니터에 실시간 반영됩니다.</p>
 
                                 {/* Manage Sub-Tabs */}
@@ -1475,7 +1702,12 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                         .filter(m => {
                                             if (activeManageTab === '전체') return true;
                                             if (activeManageTab === '예선 조별리그') return typeof m.group_id === 'number' || (typeof m.group_id === 'string' && m.group_id.includes('조'));
-                                            if (activeManageTab === '16강') return m.group_id === '본선 16강 (무작위)' || m.group_id === '16강';
+                                            if (activeManageTab === '본선 32강') return m.group_id === '본선 32강';
+                                            // 16강~결승: '본선 16강', '16강', '본선 16강 (무작위)' 등 모두 포함
+                                            if (activeManageTab === '16강') return ['본선 16강', '16강', '본선 16강 (무작위)'].includes(m.group_id);
+                                            if (activeManageTab === '8강')  return ['본선 8강',  '8강'].includes(m.group_id);
+                                            if (activeManageTab === '4강')  return ['본선 4강',  '4강'].includes(m.group_id);
+                                            if (activeManageTab === '결승')  return ['본선 결승', '결승'].includes(m.group_id);
                                             return m.group_id === activeManageTab;
                                         })
                                         .sort((a, b) => {
@@ -1502,6 +1734,7 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                                     teamB={getTeam(match.team_b_id)}
                                                     isAdmin={true}
                                                     allMatches={data.matches}
+                                                    courts={data.courts}
                                                 />
                                             );
                                         })}
@@ -1532,6 +1765,47 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                         <p className="card-desc">빈 코트가 생기면 대기 중인 경기를 자동으로 배정합니다.</p>
                         <button onClick={handleAutoAssign} disabled={isProcessing} className="modern-button secondary full-width">⚡ 코트 자동 배정</button>
                     </div>
+                    {/* 점수 리셋 버튼 - 테스트용, 참가자·조·대진 구조는 유지 */}
+                    <div className="glass-card control-card" style={{ border: '1px solid rgba(255,80,80,0.35)', background: 'rgba(80,10,10,0.4)' }}>
+                        <div className="card-header"><h3 style={{ color: '#ff6b6b' }}>🔄 점수 리셋 (테스트용)</h3></div>
+                        <p className="card-desc" style={{ color: '#ff9999', fontSize: '0.82rem' }}>
+                            참가자·조·대진 구조는 <strong>절대 변경되지 않습니다.</strong><br/>
+                            모든 경기 점수·상태·코트 배정만 초기화해서 처음부터 다시 테스트합니다.
+                        </p>
+                        <button
+                            onClick={handleScoreReset}
+                            disabled={isProcessing}
+                            className="modern-button full-width"
+                            style={{ background: 'linear-gradient(135deg,#c62828,#b71c1c)', color: '#fff', fontWeight: 700 }}
+                        >
+                            🔄 점수 전체 리셋 (예선부터 재시작)
+                        </button>
+                    </div>
+                    {/* 16강 일괄 시작 버튼 - 32강 완료 후 브레이크타임 뒤 관리자 수동 시작 */}
+                    {(() => {
+                        const ko32Done = data.matches.filter(m => m.group_id === '본선 32강').length > 0 &&
+                            data.matches.filter(m => m.group_id === '본선 32강').every(m => m.status === 'COMPLETED');
+                        const ko16Ready = data.matches.filter(m =>
+                            m.group_id === '본선 16강' &&
+                            m.status === 'PENDING' &&
+                            m.team_a_id !== 'TBD' && m.team_b_id !== 'TBD'
+                        ).length > 0;
+                        if (!ko32Done || !ko16Ready) return null;
+                        return (
+                            <div className="glass-card control-card" style={{ border: '2px solid #1de9b6', boxShadow: '0 0 20px rgba(29,233,182,0.3)' }}>
+                                <div className="card-header"><h3>🚀 16강 시작</h3></div>
+                                <p className="card-desc" style={{ color: '#1de9b6', fontWeight: 700 }}>32강 완료! 브레이크타임 후 아래 버튼으로 16강을 일괄 시작하세요.</p>
+                                <button
+                                    onClick={handleStart16Kang}
+                                    disabled={isProcessing}
+                                    className="modern-button full-width"
+                                    style={{ background: 'linear-gradient(135deg, #1de9b6, #00bfa5)', color: '#000', fontWeight: 900, fontSize: '1.1rem', padding: '14px' }}
+                                >
+                                    🎾 16강 전 경기 코트 배정!
+                                </button>
+                            </div>
+                        );
+                    })()}
                     <div className="glass-card help-card">
                         <div className="card-header"><h3>ℹ️ 도움말</h3></div>
                         <ul className="help-list">

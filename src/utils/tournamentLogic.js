@@ -152,16 +152,16 @@ export const isGroupMatch = (m) => {
 
 // Strict Court Schedule for Group Stages (from user image)
 const FIXED_COURT_SCHEDULE = {
-    "1": [ { g: 11, m: 1 }, { g: 12, m: 1 }, { g: 1, m: 2 }, { g: 4, m: 4 }, { g: 1, m: 4 }, { g: 1, m: 5 } ],
-    "2": [ { g: 2, m: 1 }, { g: 11, m: 2 }, { g: 2, m: 2 }, { g: 2, m: 3 }, { g: 2, m: 4 }, { g: 2, m: 5 }, { g: 12, m: 6 } ],
+    "1": [ { g: 11, m: 1 }, { g: 1, m: 1 }, { g: 12, m: 2 }, { g: 1, m: 2 }, { g: 11, m: 5 }, { g: 12, m: 5 }, { g: 1, m: 3 } ],
+    "2": [ { g: 2, m: 1 }, { g: 11, m: 2 }, { g: 2, m: 2 }, { g: 2, m: 3 }, { g: 2, m: 4 }, { g: 2, m: 5 }, { g: 2, m: 6 } ],
     "3": [ { g: 3, m: 1 }, { g: 3, m: 2 }, { g: 11, m: 3 }, { g: 3, m: 3 }, { g: 3, m: 4 }, { g: 3, m: 5 }, { g: 3, m: 6 } ],
-    "4": [ { g: 4, m: 1 }, { g: 4, m: 2 }, { g: 4, m: 3 }, { g: 11, m: 4 }, { g: 5, m: 5 }, { g: 4, m: 5 }, { g: 4, m: 6 } ],
-    "5": [ { g: 5, m: 1 }, { g: 5, m: 2 }, { g: 5, m: 3 }, { g: 5, m: 4 }, { g: 11, m: 5 }, { g: 6, m: 6 }, { g: 5, m: 6 } ],
-    "6": [ { g: 6, m: 1 }, { g: 6, m: 2 }, { g: 6, m: 3 }, { g: 6, m: 4 }, { g: 6, m: 5 }, { g: 11, m: 6 }, { g: 2, m: 6 } ],
-    "7": [ { g: 7, m: 1 }, { g: 7, m: 2 }, { g: 7, m: 3 }, { g: 7, m: 4 }, { g: 12, m: 4 }, { g: 12, m: 5 }, { g: 7, m: 6 } ],
-    "8": [ { g: 8, m: 1 }, { g: 8, m: 2 }, { g: 8, m: 3 }, { g: 12, m: 3 }, { g: 7, m: 5 }, { g: 8, m: 5 }, { g: 8, m: 6 } ],
-    "9": [ { g: 9, m: 1 }, { g: 9, m: 2 }, { g: 12, m: 2 }, { g: 8, m: 4 }, { g: 9, m: 4 }, { g: 9, m: 5 }, { g: 9, m: 6 } ],
-    "10": [ { g: 10, m: 1 }, { g: 10, m: 2 }, { g: 9, m: 3 }, { g: 10, m: 3 }, { g: 10, m: 4 }, { g: 10, m: 5 }, { g: 10, m: 6 } ]
+    "4": [ { g: 4, m: 1 }, { g: 4, m: 2 }, { g: 4, m: 3 }, { g: 11, m: 4 }, { g: 4, m: 4 }, { g: 4, m: 5 }, { g: 4, m: 6 } ],
+    "5": [ { g: 5, m: 1 }, { g: 5, m: 2 }, { g: 5, m: 3 }, { g: 5, m: 4 }, { g: 5, m: 5 }, { g: 5, m: 6 }, { g: 12, m: 6 } ],
+    "6": [ { g: 6, m: 1 }, { g: 6, m: 2 }, { g: 6, m: 3 }, { g: 6, m: 4 }, { g: 6, m: 5 }, { g: 11, m: 6 }, { g: 6, m: 6 } ],
+    "7": [ { g: 7, m: 1 }, { g: 7, m: 2 }, { g: 7, m: 3 }, { g: 7, m: 4 }, { g: 12, m: 4 }, { g: 7, m: 5 }, { g: 7, m: 6 } ],
+    "8": [ { g: 8, m: 1 }, { g: 8, m: 2 }, { g: 8, m: 3 }, { g: 12, m: 3 }, { g: 8, m: 4 }, { g: 8, m: 5 }, { g: 8, m: 6 } ],
+    "9": [ { g: 9, m: 1 }, { g: 9, m: 2 }, { g: 9, m: 3 }, { g: 9, m: 4 }, { g: 9, m: 5 }, { g: 9, m: 6 } ],
+    "10": [ { g: 10, m: 1 }, { g: 12, m: 1 }, { g: 10, m: 2 }, { g: 10, m: 3 }, { g: 10, m: 4 }, { g: 10, m: 5 }, { g: 10, m: 6 } ]
 };
 
 // Assign Matches to Courts
@@ -195,13 +195,8 @@ export const assignMatchesToCourts = (matches, courts) => {
     if (emptyCourts.length === 0) return { matches: nextMatches, courts: nextCourts };
 
     // 3. Keep a dynamic fallback queue ONLY for matches that are not in the fixed schedule (e.g., knockouts)
-    let pendingKnockoutMatches = nextMatches.filter(m =>
-        m.status === 'PENDING' &&
-        !m.court_id &&
-        m.team_a_id !== 'TBD' && m.team_a_id !== 'BYE' &&
-        m.team_b_id !== 'TBD' && m.team_b_id !== 'BYE' &&
-        !isGroupMatch(m) // Only pull knockout/final matches dynamically
-    );
+    // -> DISABLED: Users requested MANUAL assignment for 32강 and beyond.
+    let pendingKnockoutMatches = [];
 
     // Sort by round ascending so earlier matches get priority
     pendingKnockoutMatches.sort((a, b) => a.round - b.round);
@@ -327,8 +322,8 @@ export const calculateStandings = (teams, matches) => {
             teamA.played += 1;
             teamB.played += 1;
 
-            const scoreA = m.score_a || 0;
-            const scoreB = m.score_b || 0;
+            const scoreA = parseInt(m.score_a, 10) || 0;
+            const scoreB = parseInt(m.score_b, 10) || 0;
 
             teamA.pointsFor += scoreA;
             teamA.pointsAgainst += scoreB;
@@ -339,18 +334,20 @@ export const calculateStandings = (teams, matches) => {
             teamA.gamesWon += scoreA;
             teamB.gamesWon += scoreB;
 
-            // Tennis scoring: 5:5 = draw (무승부), otherwise higher score wins
-            // Also fall back to winner_id if explicitly set
-            const isDraw = (scoreA === 5 && scoreB === 5);
-            if (isDraw) {
-                teamA.draws += 1;
-                teamB.draws += 1;
-            } else if (m.winner_id === teamA.id || (!isDraw && scoreA > scoreB)) {
+            // Tennis scoring: Group stage ties are draws.
+            // Explicit winner_id takes precedence, otherwise compare scores.
+            const isDraw = (scoreA === scoreB);
+            
+            if (m.winner_id === teamA.id || (!isDraw && scoreA > scoreB)) {
                 teamA.wins += 1;
                 teamB.losses += 1;
             } else if (m.winner_id === teamB.id || (!isDraw && scoreB > scoreA)) {
                 teamB.wins += 1;
                 teamA.losses += 1;
+            } else if (isDraw) {
+                // If it's a tie, nobody has an explicit winner_id
+                teamA.draws += 1;
+                teamB.draws += 1;
             }
 
             teamA.goalDiff = teamA.pointsFor - teamA.pointsAgainst;
@@ -446,7 +443,31 @@ export const getTop32Teams = (groupedStandings) => {
     // Take top 8 (or however many needed to reach 32)
     const needed = 32 - top32.length;
     if (needed > 0) {
-        top32 = [...top32, ...thirdPlacers.slice(0, needed)];
+        // Safe parsing of numbers from "1조" or 1
+        const getGroupNum = (team) => {
+            let groupStr = team.initial_group || team.group_id || team.group || team.originalGroup || "";
+            return parseInt(String(groupStr).replace(/[^0-9]/g, ''), 10);
+        };
+
+        // Special handling for 1조3등 (Group 1 third placer)
+        const group1Third = thirdPlacers.find(t => getGroupNum(t) === 1);
+        const otherThirdPlacers = thirdPlacers.filter(t => getGroupNum(t) !== 1);
+
+        const wildcardSlots = needed;
+        const otherWildcardCount = group1Third ? wildcardSlots - 1 : wildcardSlots;
+
+        const selectedOtherThirds = otherThirdPlacers.slice(0, otherWildcardCount);
+
+        if (group1Third) {
+            group1Third.wildcardRank = '1조3등';
+            top32.push(group1Third); // 1조 3위 무조건 포함
+        }
+
+        selectedOtherThirds.forEach((t, i) => {
+            t.wildcardRank = i + 1; // 1 to 7
+        });
+
+        top32 = [...top32, ...selectedOtherThirds];
     }
 
     // Finally sort the 32 teams by overall performance to seed them 1 to 32
@@ -471,50 +492,73 @@ export const getTop32Teams = (groupedStandings) => {
 };
 
 // Assign wildcards using backtracking to avoid same-group matchups
-const assignWildcards = (wildcardTeams, exactBracketSlots, allTeamsMap) => {
-    // exactBracketSlots: array of objects { index: matchIndex, opponent: teamObj }
+const assignWildcards = (wildcardTeams, exactBracketSlots) => {
+    // exactBracketSlots: array of objects { idx, opponent, expectedW }
     const assignedSlots = new Array(8).fill(null);
     const usedWildcards = new Set();
 
-    // Helper to get group number from a team
     const getGroupNum = (team) => {
         if (!team) return null;
         let groupStr = team.initial_group || team.group_id || team.group || "";
         return parseInt(String(groupStr).replace(/[^0-9]/g, ''), 10);
     };
 
+    // The sequential order of wildcards for the "shift to next rank" logic
+    const wRanks = [1, 2, 3, 4, 5, 6, 7, '1조3등'];
+    
+    // Create a map for quick lookup
+    const wMap = {};
+    wildcardTeams.forEach(t => {
+        wMap[t.wildcardRank] = t;
+    });
+
     const backtrack = (slotIdx) => {
-        if (slotIdx === 8) return true; // All assigned successfully
+        if (slotIdx === 8) return true; // All 8 wildcards assigned successfully
 
         const slot = exactBracketSlots[slotIdx];
         const opponentGroup = getGroupNum(slot.opponent);
 
-        for (let i = 0; i < wildcardTeams.length; i++) {
-            if (usedWildcards.has(i)) continue;
+        // Find where the slot's expected 'w' is in the sequence
+        const startIdx = wRanks.indexOf(slot.expectedW);
+        
+        // Generate preference order: expectedW -> next -> next ... wrap around
+        const preferredRanks = [];
+        if (startIdx !== -1) {
+            for (let i = 0; i < 8; i++) {
+                preferredRanks.push(wRanks[(startIdx + i) % 8]);
+            }
+        } else {
+            // Fallback just in case
+            preferredRanks.push(...wRanks);
+        }
 
-            const wTeam = wildcardTeams[i];
+        for (const wRank of preferredRanks) {
+            const wTeam = wMap[wRank];
+            if (!wTeam) continue; // Should not happen if exactly 8 valid teams
+
+            if (usedWildcards.has(wTeam.id)) continue;
+
             const wGroup = getGroupNum(wTeam);
 
             // Constraint: Wildcard team cannot face a team from the same group
             if (opponentGroup !== wGroup) {
                 // Try assigning
                 assignedSlots[slotIdx] = wTeam;
-                usedWildcards.add(i);
+                usedWildcards.add(wTeam.id);
 
-                if (backtrack(slotIdx + 1)) return true; // Found a valid full assignment
+                if (backtrack(slotIdx + 1)) return true;
 
                 // Undo
                 assignedSlots[slotIdx] = null;
-                usedWildcards.delete(i);
+                usedWildcards.delete(wTeam.id);
             }
         }
         return false;
     };
 
-    // If backtracking fails, just assign them sequentially and cross your fingers (fallback)
     if (!backtrack(0)) {
-        console.warn("Could not find a perfect wildcard assignment without group overlap. Falling back to sequential.");
-        return wildcardTeams; // Just return them in order
+        console.warn("Could not find a perfect wildcard assignment constraint. Falling back.");
+        return wildcardTeams; // Just return them sequentially
     }
 
     return assignedSlots;
@@ -524,23 +568,23 @@ const assignWildcards = (wildcardTeams, exactBracketSlots, allTeamsMap) => {
 // Describes which group rank fills each of the 16 first-round match slots.
 // 'W' = wildcard (조 3위). Used by both shell init and progressive filling.
 export const FIXED_BRACKET_LAYOUT = [
-    { a: { rank: 1, g: 1 }, b: { rank: 2, g: 5 } },   // M1  (no wildcard, Court 1 priority)
-    { a: { rank: 1, g: 10 }, b: { rank: 2, g: 6 } },  // M2  (no wildcard, Court 2 priority)
-    { a: { rank: 1, g: 3 }, b: { rank: 2, g: 7 } },   // M3  (no wildcard, Court 3 priority)
-    { a: { rank: 1, g: 12 }, b: { rank: 2, g: 8 } },  // M4  (no wildcard, Court 4 priority)
-    { a: { rank: 1, g: 6 }, b: { rank: 2, g: 10 } },  // M5  (no wildcard, Court 5 priority)
-    { a: { rank: 2, g: 4 }, b: { rank: 2, g: 9 } },   // M6  (no wildcard, Court 6 priority)
-    { a: { rank: 2, g: 2 }, b: { rank: 2, g: 11 } },  // M7  (no wildcard, Court 7 priority)
-    { a: { rank: 1, g: 8 }, b: { rank: 2, g: 12 } },  // M8  (no wildcard, Court 8 priority)
-    // Matches 9~16 contain all Wildcard games so they can be assigned dynamic later
-    { a: { rank: 1, g: 2 }, b: { rank: 3, g: 'W' } }, // M9
-    { a: { rank: 1, g: 4 }, b: { rank: 3, g: 'W' } }, // M10
-    { a: { rank: 1, g: 5 }, b: { rank: 3, g: 'W' } }, // M11
-    { a: { rank: 1, g: 7 }, b: { rank: 3, g: 'W' } }, // M12
-    { a: { rank: 1, g: 9 }, b: { rank: 3, g: 'W' } }, // M13
-    { a: { rank: 1, g: 11 }, b: { rank: 3, g: 'W' } },// M14
-    { a: { rank: 2, g: 1 }, b: { rank: 3, g: 'W' } }, // M15
-    { a: { rank: 2, g: 3 }, b: { rank: 3, g: 'W' } }  // M16
+    { a: { rank: 1, g: 1 }, b: { rank: 2, g: 5 } },                           // M1: 1조1위 vs 5조2위
+    { a: { rank: 1, g: 2 }, b: { rank: 3, g: 'W', w: 4 } },                   // M2: 2조1위 vs 3위 4등
+    { a: { rank: 1, g: 3 }, b: { rank: 2, g: 7 } },                           // M3: 3조1위 vs 7조2위
+    { a: { rank: 1, g: 4 }, b: { rank: 3, g: 'W', w: 5 } },                   // M4: 4조1위 vs 3위 5등
+    { a: { rank: 1, g: 5 }, b: { rank: 3, g: 'W', w: 6 } },                   // M5: 5조1위 vs 3위 6등
+    { a: { rank: 1, g: 6 }, b: { rank: 2, g: 10 } },                          // M6: 6조1위 vs 10조2위
+    { a: { rank: 1, g: 7 }, b: { rank: 3, g: 'W', w: 7 } },                   // M7: 7조1위 vs 3위 7등
+    { a: { rank: 1, g: 8 }, b: { rank: 2, g: 12 } },                          // M8: 8조1위 vs 12조2위
+    
+    { a: { rank: 1, g: 9 }, b: { rank: 3, g: 'W', w: '1조3등' } },            // M9: 9조1위 vs 1조 3등
+    { a: { rank: 1, g: 10 }, b: { rank: 2, g: 6 } },                          // M10: 10조1위 vs 6조2위
+    { a: { rank: 1, g: 11 }, b: { rank: 3, g: 'W', w: 3 } },                  // M11: 11조1위 vs 3위 3등
+    { a: { rank: 1, g: 12 }, b: { rank: 2, g: 8 } },                          // M12: 12조1위 vs 8조2위
+    { a: { rank: 2, g: 4 }, b: { rank: 2, g: 9 } },                           // M13: 4조2위 vs 9조2위
+    { a: { rank: 2, g: 3 }, b: { rank: 3, g: 'W', w: 2 } },                   // M14: 3조2위 vs 3위 2등
+    { a: { rank: 2, g: 2 }, b: { rank: 2, g: 11 } },                          // M15: 2조2위 vs 11조2위
+    { a: { rank: 2, g: 1 }, b: { rank: 3, g: 'W', w: 1 } }                    // M16: 1조2위 vs 3위 1등
 ];
 
 // Create an empty 32-bracket shell (all slots TBD) to store in Firebase early.
@@ -657,27 +701,7 @@ export const generateBracket32 = (top32Teams, groupedStandings) => {
         else if (t.groupRank === 3) wildcards.push(t);
     });
 
-    // 2. Define the exact fixed bracket mapping (1-16)
-    // "W" implies a wildcard slot (3위)
-    const fixedLayout = [
-        { a: { rank: 1, g: 1 }, b: { rank: 2, g: 5 } },   // M1  (Court 1 priority)
-        { a: { rank: 1, g: 10 }, b: { rank: 2, g: 6 } },  // M2  (Court 2 priority)
-        { a: { rank: 1, g: 3 }, b: { rank: 2, g: 7 } },   // M3  (Court 3 priority)
-        { a: { rank: 1, g: 12 }, b: { rank: 2, g: 8 } },  // M4  (Court 4 priority)
-        { a: { rank: 1, g: 6 }, b: { rank: 2, g: 10 } },  // M5  (Court 5 priority)
-        { a: { rank: 2, g: 4 }, b: { rank: 2, g: 9 } },   // M6  (Court 6 priority)
-        { a: { rank: 2, g: 2 }, b: { rank: 2, g: 11 } },  // M7  (Court 7 priority)
-        { a: { rank: 1, g: 8 }, b: { rank: 2, g: 12 } },  // M8  (Court 8 priority)
-        // Matches 9~16 contain all Wildcard games
-        { a: { rank: 1, g: 2 }, b: { rank: 3, g: 'W' } }, // M9
-        { a: { rank: 1, g: 4 }, b: { rank: 3, g: 'W' } }, // M10
-        { a: { rank: 1, g: 5 }, b: { rank: 3, g: 'W' } }, // M11
-        { a: { rank: 1, g: 7 }, b: { rank: 3, g: 'W' } }, // M12
-        { a: { rank: 1, g: 9 }, b: { rank: 3, g: 'W' } }, // M13
-        { a: { rank: 1, g: 11 }, b: { rank: 3, g: 'W' } },// M14
-        { a: { rank: 2, g: 1 }, b: { rank: 3, g: 'W' } }, // M15
-        { a: { rank: 2, g: 3 }, b: { rank: 3, g: 'W' } }  // M16
-    ];
+    // 2. We use the global FIXED_BRACKET_LAYOUT for exact mappings.
 
     // Helper to fetch the actual team object
     const getTeam = (slot) => {
@@ -686,17 +710,18 @@ export const generateBracket32 = (top32Teams, groupedStandings) => {
     };
 
     // 3. Setup Wildcard assignment constraints
-    // Find all 'W' slots and mark their opponents
-    const wildcardSlots = []; // { indexInMatch, opponentTeam }
-    fixedLayout.forEach((matchDef, idx) => {
-        if (matchDef.a.g === 'W') wildcardSlots.push({ idx, opponent: getTeam(matchDef.b) });
-        if (matchDef.b.g === 'W') wildcardSlots.push({ idx, opponent: getTeam(matchDef.a) });
+    const wildcardSlots = []; // { indexInMatch, opponentTeam, expectedW }
+    FIXED_BRACKET_LAYOUT.forEach((matchDef, idx) => {
+        if (matchDef.a.g === 'W') wildcardSlots.push({ idx, opponent: getTeam(matchDef.b), expectedW: matchDef.a.w });
+        if (matchDef.b.g === 'W') wildcardSlots.push({ idx, opponent: getTeam(matchDef.a), expectedW: matchDef.b.w });
     });
 
     // Run backtracking to safely place wildcards
     let assignedWildcards = [];
-    if (wildcards.length > 0) {
-        assignedWildcards = assignWildcards(wildcards, wildcardSlots, null);
+    if (wildcards.length === 8) {
+        assignedWildcards = assignWildcards(wildcards, wildcardSlots);
+    } else if (wildcards.length > 0) {
+        assignedWildcards = wildcards; // fallback if not exactly 8
     }
 
     // We map back to the wildcardSlots
@@ -707,7 +732,7 @@ export const generateBracket32 = (top32Teams, groupedStandings) => {
 
     // 4. Construct matches in order
     const matches = [];
-    fixedLayout.forEach((matchDef, idx) => {
+    FIXED_BRACKET_LAYOUT.forEach((matchDef, idx) => {
         let teamA = matchDef.a.g === 'W' ? assignedWildcardMap[idx] : getTeam(matchDef.a);
         let teamB = matchDef.b.g === 'W' ? assignedWildcardMap[idx] : getTeam(matchDef.b);
 

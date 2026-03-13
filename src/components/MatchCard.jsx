@@ -1,8 +1,19 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { updateMatch, updateCourt, uploadData } from '../services/firebase';
 import { updateTournamentProgression, FIXED_BRACKET_LAYOUT } from '../utils/tournamentLogic';
 
-const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
+const isManualRound = (groupId) =>
+    typeof groupId === 'string' &&
+    !groupId.includes('조') &&
+    !/^\d+$/.test(groupId); // 본선 토너먼트는 모두 수동 배정
+
+const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches, courts }) => {
+  const [selectedCourt, setSelectedCourt] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [editMode, setEditMode] = useState(false);
+  const [editScoreA, setEditScoreA] = useState('');
+  const [editScoreB, setEditScoreB] = useState('');
+  const [saving, setSaving] = useState(false);
   const isCompleted = match.status === 'COMPLETED';
   const isLive = match.status === 'LIVE';
   const isPending = match.status === 'PENDING' || match.status === 'SCHEDULED';
@@ -27,15 +38,16 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
           
           // If we have a real team, check if it's the wildcard slot
           if (team && team.id !== 'TBD' && team.id !== 'BYE' && def.g === 'W') {
-             const originGroup = team.initial_group ? String(team.initial_group).replace(/조/g, '') : '?';
+             const originGroup = team.initial_group ? String(team.initial_group).replace(/조/g, '') : (team.group_id ? String(team.group_id).replace(/조/g, '') : '');
              const originRank = team.groupRank || '3';
              return `${originGroup}조 ${originRank}위`;
           }
           
-          // Otherwise show the fixed definition (e.g. "1조 1위" or "9조 2위" or "3위(W)")
-          const groupLabel = def.g === 'W' ? '3' : def.g;
-          const rankLabel = def.g === 'W' ? '위(W)' : `${def.rank}위`;
-          return `${groupLabel}조 ${rankLabel}`;
+          // Otherwise show the fixed definition from FIXED_BRACKET_LAYOUT
+          if (def.g === 'W') {
+              return '조 3위';
+          }
+          return `${def.g}조 ${def.rank}위`;
         }
       }
     }
@@ -53,8 +65,30 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
 
   const handleScore = async (team, delta) => {
     const field = team === 'A' ? 'score_a' : 'score_b';
-    const newScore = Math.max(0, (match[field] || 0) + delta);
-    await updateMatch(match.id, { [field]: newScore });
+    const scoreA = team === 'A' ? Math.max(0, (match.score_a || 0) + delta) : (match.score_a || 0);
+    const scoreB = team === 'B' ? Math.max(0, (match.score_b || 0) + delta) : (match.score_b || 0);
+
+    let updates = { [field]: team === 'A' ? scoreA : scoreB };
+    let newWinnerId = null;
+
+    if (isCompleted) {
+        if (scoreA > scoreB) newWinnerId = match.team_a_id;
+        else if (scoreB > scoreA) newWinnerId = match.team_b_id;
+        updates.winner_id = newWinnerId;
+    }
+
+    await updateMatch(match.id, updates);
+
+    // If completed, trigger immediate progression update for better UX (Self-healing in App.jsx will also catch this)
+    if (isCompleted && allMatches) {
+        const nextMatchObj = allMatches.find(m => m.id === match.next_match_id);
+        if (nextMatchObj) {
+            const val = newWinnerId || 'TBD';
+            await updateMatch(nextMatchObj.id, {
+                [match.is_team_a_next ? 'team_a_id' : 'team_b_id']: val
+            });
+        }
+    }
   };
 
   const handleStatus = async (newStatus) => {
@@ -82,31 +116,84 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
       }
     } else {
       updates.winner_id = null; // Reset winner if not completed
+      if ((newStatus === 'PENDING' || newStatus === 'SCHEDULED') && match.court_id) {
+          updates.court_id = null;
+          try { await updateCourt(parseInt(match.court_id), { match_id: null }); } catch (e) { console.error('Error freeing court:', e); }
+      }
     }
 
     await updateMatch(match.id, updates);
 
-    // If completed by admin and we have allMatches passed, trigger auto-advancement
-    if (newStatus === 'COMPLETED' && newWinnerId && allMatches) {
-      const tempMatches = allMatches.map(m => m.id === match.id ? { ...m, ...updates } : m);
-      const nextMatches = updateTournamentProgression(tempMatches, match.id, newWinnerId);
-      // Only upload if something actually changed to avoid unnecessary writes
-      if (JSON.stringify(tempMatches) !== JSON.stringify(nextMatches)) {
-        // We just need to update the entire matches array in FB
-        // Rather than a full uploadData, doing it here is fine since uploadData takes { matches }
-        // Let's create a minimal payload that won't break uploadData (it needs teams, groups etc normally)
-        // Wait, uploadData loops over the provided keys. Let's just update the specific changed matches to be efficient, or just call uploadData with the matches array.
-        // Actually, updating just the next match document is much safer here.
+    // If status changed, handle progression
+    if (allMatches && match.next_match_id) {
+        const nextMatchObj = allMatches.find(nm => nm.id === match.next_match_id);
+        if (nextMatchObj) {
+            const val = newWinnerId || 'TBD';
+            await updateMatch(nextMatchObj.id, {
+                [match.is_team_a_next ? 'team_a_id' : 'team_b_id']: val
+            });
+        }
+    }
+  };
 
-        const nextMatch = nextMatches.find(m => m.id === match.next_match_id);
-        if (nextMatch) {
-          await updateMatch(nextMatch.id, {
-            team_a_id: nextMatch.team_a_id,
-            team_b_id: nextMatch.team_b_id
+  // ── 되돌리기: COMPLETED → PENDING, 다음 라운드 슬롯도 TBD로 ──────────────
+  const handleRevert = async () => {
+    const label = `[${teamA.name}] vs [${teamB.name}]`;
+    if (!confirm(`${match.group_id} 경기 결과를 되돌리시겠습니까?\n${label}\n\n점수와 승자가 초기화되고, 다음 라운드 슬롯도 TBD로 돌아갑니다.`)) return;
+    setSaving(true);
+    try {
+      await updateMatch(match.id, {
+        status: 'PENDING',
+        score_a: null, score_b: null,
+        tb_score_a: null, tb_score_b: null,
+        winner_id: null, court_id: null
+      });
+      if (match.court_id) {
+        try { await updateCourt(parseInt(match.court_id), { match_id: null }); } catch (_) {}
+      }
+      if (allMatches && match.next_match_id) {
+        const nextM = allMatches.find(m => m.id === match.next_match_id);
+        if (nextM) {
+          await updateMatch(nextM.id, {
+            [match.is_team_a_next ? 'team_a_id' : 'team_b_id']: 'TBD'
           });
         }
       }
-    }
+    } catch (e) { alert('오류: ' + e.message); }
+    finally { setSaving(false); }
+  };
+
+  // ── 결과 수정: 점수 재입력 후 저장 ──────────────────────────────────────────
+  const handleEditOpen = () => {
+    setEditScoreA(match.score_a != null ? String(match.score_a) : '');
+    setEditScoreB(match.score_b != null ? String(match.score_b) : '');
+    setEditMode(true);
+  };
+
+  const handleEditSave = async () => {
+    const sa = parseInt(editScoreA);
+    const sb = parseInt(editScoreB);
+    if (isNaN(sa) || isNaN(sb)) { alert('점수를 올바르게 입력해주세요.'); return; }
+    if (isKnockout && sa === sb) { alert('본선 경기는 동점이 없습니다. 승자를 명확히 입력해주세요.'); return; }
+
+    const prevWinnerId = match.winner_id;
+    const newWinnerId = sa > sb ? match.team_a_id : (sb > sa ? match.team_b_id : null);
+
+    if (!confirm(`[${teamA.name}] ${sa} : ${sb} [${teamB.name}]\n\n이 결과로 수정하시겠습니까?`)) return;
+    setSaving(true);
+    try {
+      await updateMatch(match.id, { score_a: sa, score_b: sb, winner_id: newWinnerId });
+      if (allMatches && match.next_match_id && newWinnerId !== prevWinnerId) {
+        const nextM = allMatches.find(m => m.id === match.next_match_id);
+        if (nextM) {
+          await updateMatch(nextM.id, {
+            [match.is_team_a_next ? 'team_a_id' : 'team_b_id']: newWinnerId || 'TBD'
+          });
+        }
+      }
+      setEditMode(false);
+    } catch (e) { alert('오류: ' + e.message); }
+    finally { setSaving(false); }
   };
 
   const adminBtnStyle = {
@@ -121,6 +208,26 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center'
+  };
+
+  const handleCourtAssign = async () => {
+    if (!selectedCourt) { alert('코트 번호를 선택해주세요.'); return; }
+    const courtNum = parseInt(selectedCourt);
+    if (!confirm(`${match.group_id} 경기를 ${courtNum}번 코트에 배정하고 시작하시겠습니까?`)) return;
+    setAssigning(true);
+    try {
+      // Free the old court if any
+      if (match.court_id && match.court_id !== courtNum) {
+        await updateCourt(parseInt(match.court_id), { match_id: null });
+      }
+      await updateMatch(match.id, { status: 'LIVE', court_id: courtNum });
+      await updateCourt(courtNum, { match_id: match.id });
+      setSelectedCourt('');
+    } catch (e) {
+      alert('오류: ' + e.message);
+    } finally {
+      setAssigning(false);
+    }
   };
 
   return (
@@ -197,6 +304,65 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
         </div>
       </div>
 
+      {/* 수동 코트 배정 UI: 16강 이후 PENDING + 관리자 모드 */}
+      {isAdmin && isPending && !isLive && isManualRound(match.group_id) &&
+        teamA.id !== 'TBD' && teamA.id !== 'BYE' &&
+        teamB.id !== 'TBD' && teamB.id !== 'BYE' && (
+        <div style={{
+          marginTop: '10px',
+          padding: '10px 12px',
+          background: 'rgba(29,233,182,0.07)',
+          border: '1px solid rgba(29,233,182,0.25)',
+          borderRadius: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+          flexWrap: 'wrap'
+        }}>
+          <span style={{ color: '#1de9b6', fontSize: '0.8rem', fontWeight: 700 }}>🎾 코트 배정</span>
+          <select
+            value={selectedCourt}
+            onChange={e => setSelectedCourt(e.target.value)}
+            style={{
+              background: '#1a2a22',
+              color: '#1de9b6',
+              border: '1px solid rgba(29,233,182,0.4)',
+              borderRadius: '6px',
+              padding: '4px 8px',
+              fontSize: '0.85rem',
+              cursor: 'pointer'
+            }}
+          >
+            <option value=''>코트 선택</option>
+            {(courts || []).map(c => {
+              const isFree = !c.match_id;
+              return (
+                <option key={c.id} value={c.id}>
+                  {c.id}번 코트 {isFree ? '✅ 빔' : '🔴 사용중'}
+                </option>
+              );
+            })}
+          </select>
+          <button
+            onClick={handleCourtAssign}
+            disabled={assigning || !selectedCourt}
+            style={{
+              background: selectedCourt ? 'linear-gradient(135deg,#1de9b6,#00bfa5)' : '#444',
+              color: selectedCourt ? '#000' : '#777',
+              border: 'none',
+              borderRadius: '6px',
+              padding: '5px 14px',
+              fontWeight: 700,
+              fontSize: '0.85rem',
+              cursor: selectedCourt ? 'pointer' : 'not-allowed',
+              transition: 'all 0.2s'
+            }}
+          >
+            {assigning ? '배정 중...' : '▶ 시작'}
+          </button>
+        </div>
+      )}
+
       {/* Live Tiebreak Indicator: knockout match LIVE at 5:5 */}
       {isLive && match.score_a === 5 && match.score_b === 5 &&
         typeof match.group_id === 'string' && !/^\d+조$/.test(match.group_id) && (
@@ -225,6 +391,82 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches }) => {
             </span>
           </div>
         )}
+
+      {/* ── 관리자 되돌리기 / 결과 수정 (COMPLETED 경기 전용) ── */}
+      {isAdmin && isCompleted && (
+        <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255,255,255,0.07)', paddingTop: '10px' }}>
+          {!editMode ? (
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              {/* 되돌리기 버튼 */}
+              <button
+                onClick={handleRevert}
+                disabled={saving}
+                style={{
+                  flex: 1, minWidth: '100px',
+                  padding: '6px 10px',
+                  fontSize: '0.78rem', fontWeight: 700,
+                  background: 'rgba(255,120,50,0.15)',
+                  color: '#ff9966',
+                  border: '1px solid rgba(255,120,50,0.4)',
+                  borderRadius: '6px', cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                {saving ? '처리 중...' : '↩ 결과 되돌리기'}
+              </button>
+              {/* 결과 수정 버튼 */}
+              <button
+                onClick={handleEditOpen}
+                disabled={saving}
+                style={{
+                  flex: 1, minWidth: '100px',
+                  padding: '6px 10px',
+                  fontSize: '0.78rem', fontWeight: 700,
+                  background: 'rgba(100,160,255,0.15)',
+                  color: '#88aaff',
+                  border: '1px solid rgba(100,160,255,0.4)',
+                  borderRadius: '6px', cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                ✏️ 결과 수정
+              </button>
+            </div>
+          ) : (
+            /* 인라인 점수 수정 모드 */
+            <div style={{ background: 'rgba(100,160,255,0.07)', border: '1px solid rgba(100,160,255,0.3)', borderRadius: '8px', padding: '10px' }}>
+              <div style={{ fontSize: '0.78rem', color: '#88aaff', fontWeight: 700, marginBottom: '8px' }}>✏️ 점수 수정</div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flex: 1 }}>
+                  <span style={{ fontSize: '0.7rem', color: '#aaa', maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{teamA.name}</span>
+                  <input type="number" min="0" max="10" value={editScoreA}
+                    onChange={e => setEditScoreA(e.target.value)}
+                    style={{ width: '56px', height: '48px', fontSize: '1.6rem', textAlign: 'center', fontWeight: 700, background: '#111', color: 'var(--tennis-yellow)', border: '1px solid #555', borderRadius: '8px' }}
+                  />
+                </div>
+                <span style={{ color: '#555', fontWeight: 900, fontSize: '1.2rem' }}>:</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px', flex: 1 }}>
+                  <span style={{ fontSize: '0.7rem', color: '#aaa', maxWidth: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{teamB.name}</span>
+                  <input type="number" min="0" max="10" value={editScoreB}
+                    onChange={e => setEditScoreB(e.target.value)}
+                    style={{ width: '56px', height: '48px', fontSize: '1.6rem', textAlign: 'center', fontWeight: 700, background: '#111', color: 'var(--tennis-yellow)', border: '1px solid #555', borderRadius: '8px' }}
+                  />
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: '6px', marginTop: '8px' }}>
+                <button onClick={handleEditSave} disabled={saving}
+                  style={{ flex: 1, padding: '7px', fontSize: '0.82rem', fontWeight: 700, background: 'linear-gradient(135deg,#1565c0,#0d47a1)', color: '#fff', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+                  {saving ? '저장 중...' : '💾 저장'}
+                </button>
+                <button onClick={() => setEditMode(false)} disabled={saving}
+                  style={{ padding: '7px 12px', fontSize: '0.82rem', background: '#333', color: '#aaa', border: 'none', borderRadius: '6px', cursor: 'pointer' }}>
+                  취소
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       <style>{`
         .match-card {

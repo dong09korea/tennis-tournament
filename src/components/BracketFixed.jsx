@@ -35,28 +35,22 @@ const BracketFixed = ({ matches, teams, courts, isAdmin, numCourts, activeTab })
         return matches.find(m => m.id === court.match_id);
     };
 
-    // Tab Navigation: group tab    // Determine available knockout rounds
+    // Tab Navigation: Always show group and all bracket tabs
     let availableTabs = [];
     if (matches && matches.length > 0) {
         if (matches.some(m => !isNaN(parseInt(m.group_id)))) availableTabs.push({ id: 'group', label: '예선 조별리그' });
+    }
 
-        const koMatches = matches.filter(m => isNaN(parseInt(m.group_id)));
-        if (koMatches.length > 0) {
-            // Restore "전체" tab
-            availableTabs.push({ id: 'all', label: '전체' });
-
-            const r32 = koMatches.some(m => m.round === 32);
-
-            // If any knockout matches exist, always show all bracket tabs
-            // as KnockoutTree generates TBD dummy matches for them automatically.
-            if (r32 || koMatches.length > 0) {
-                availableTabs.push({ id: '32강', label: '32강' });
-                availableTabs.push({ id: '16강', label: '16강' });
-                availableTabs.push({ id: '8강', label: '8강' });
-                availableTabs.push({ id: '4강', label: '4강' });
-                availableTabs.push({ id: '결승', label: '결승' });
-            }
-        }
+    // Always show the knockout bracket tabs (even before group stage finishes)
+    // KnockoutTree will render seeded dummy matches when real matches don't exist yet
+    const koMatches = matches.filter(m => !isGroupStageMatch(m));
+    if (matches.length > 0) {
+        availableTabs.push({ id: 'all', label: '전체' });
+        availableTabs.push({ id: '32강', label: '32강' });
+        availableTabs.push({ id: '16강', label: '16강' });
+        availableTabs.push({ id: '8강', label: '8강' });
+        availableTabs.push({ id: '4강', label: '4강' });
+        availableTabs.push({ id: '결승', label: '결승' });
     }
 
     const [activeTabId, setActiveTabId] = useState('group');
@@ -177,7 +171,7 @@ const BracketFixed = ({ matches, teams, courts, isAdmin, numCourts, activeTab })
 
                     <div className="bracket-container">
                         {activeTabId !== 'group' && (
-                            <KnockoutTree matches={matches} teams={teams} isAdmin={isAdmin} rounds={rounds} activeTabId={activeTabId} />
+                            <KnockoutTree matches={matches} teams={teams} courts={courts} isAdmin={isAdmin} rounds={rounds} activeTabId={activeTabId} />
                         )}
                         {activeTabId === 'group' && groupMatches.length > 0 && (
                             <div className="bracket-round" style={{ minWidth: '100%', padding: '0 1rem' }}>

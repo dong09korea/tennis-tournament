@@ -1,7 +1,7 @@
 import React from 'react';
 import MatchCard from './MatchCard';
 
-const KnockoutTree = ({ matches, teams, isAdmin, activeTabId }) => {
+const KnockoutTree = ({ matches, teams, courts, isAdmin, activeTabId }) => {
     const getTeam = (id) => teams.find(t => t.id === id) || { id: 'TBD', name: 'TBD', player1: '', player2: '' };
 
     // Get knockout matches 
@@ -26,8 +26,17 @@ const KnockoutTree = ({ matches, teams, isAdmin, activeTabId }) => {
             if (existingMatch) {
                 result.push(existingMatch);
             } else {
+                // For 32강 dummy matches, use the proper ko32_m{n} ID so that
+                // MatchCard's getRankLabel can look up FIXED_BRACKET_LAYOUT
+                // and display the pre-assigned seeding (e.g. "1조 1위", "2조 2위")
+                let dummyId;
+                if (roundId === '본선 32강' || roundId === '32강') {
+                    dummyId = `ko32_m${matchIndex + 1}`;
+                } else {
+                    dummyId = `dummy_${roundId}_${matchIndex}`;
+                }
                 result.push({
-                    id: `dummy_${roundId}_${matchIndex}`,
+                    id: dummyId,
                     group_id: roundId,
                     team_a_id: 'TBD',
                     team_b_id: 'TBD',
@@ -63,7 +72,7 @@ const KnockoutTree = ({ matches, teams, isAdmin, activeTabId }) => {
                 {columnMatches.map((match, mIndex) => (
                     <div key={match.id} className="tree-match-node">
                         <div className="tree-match-card-wrapper">
-                            <MatchCard match={match} teamA={getTeam(match.team_a_id)} teamB={getTeam(match.team_b_id)} isAdmin={isAdmin} allMatches={matches} />
+                            <MatchCard match={match} teamA={getTeam(match.team_a_id)} teamB={getTeam(match.team_b_id)} isAdmin={isAdmin} allMatches={matches} courts={courts} />
                         </div>
                     </div>
                 ))}
@@ -160,7 +169,7 @@ const KnockoutTree = ({ matches, teams, isAdmin, activeTabId }) => {
                                 <div className="tree-match-list final-match">
                                     <div className="tree-match-node center-node">
                                         <div className="tree-match-card-wrapper">
-                                            <MatchCard match={finals[0]} teamA={getTeam(finals[0].team_a_id)} teamB={getTeam(finals[0].team_b_id)} isAdmin={isAdmin} allMatches={matches} />
+                                            <MatchCard match={finals[0]} teamA={getTeam(finals[0].team_a_id)} teamB={getTeam(finals[0].team_b_id)} isAdmin={isAdmin} allMatches={matches} courts={courts} />
                                         </div>
                                     </div>
                                 </div>
