@@ -69,6 +69,13 @@ const getWildcardIds = (allSortedGroups, tiebreakAges) => {
     if (groupTeams.length >= 3) thirdPlacers.push(groupTeams[2]);
   });
   thirdPlacers.sort((a, b) => {
+    const getGroupNum = (team) => parseInt(String(team.group_id || team.initial_group || "").replace(/[^0-9]/g, ''), 10);
+    const isAGroup1 = getGroupNum(a) === 1;
+    const isBGroup1 = getGroupNum(b) === 1;
+    
+    if (isAGroup1 && !isBGroup1) return -1;
+    if (isBGroup1 && !isAGroup1) return 1;
+
     if (b.pts !== a.pts) return b.pts - a.pts;
     if (b.wins !== a.wins) return b.wins - a.wins;
     if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
@@ -251,8 +258,8 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                         <div className="sc-name">{p1}</div>
                         {p2 && <div className="sc-name2">{p2}</div>}
                         {team.club && <div className="sc-club" style={{ color: getClubColor(team.club) }}>{team.club}</div>}
-                        {/* Admin tiebreaker age input (only for teams that finished 3 matches) */}
-                        {isAdmin && isTied && played === 3 && (() => {
+                        {/* Admin tiebreaker age input */}
+                        {isAdmin && isTied && (() => {
                           const ageEntered = tiebreakAges[team.id] !== undefined;
                           return (
                             <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '5px' }}>
@@ -267,8 +274,13 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                               <input
                                 type="number"
                                 placeholder="예: 140"
-                                value={tiebreakAges[team.id] ?? ''}
+                                value={tiebreakAges[team.id] ?? team.tiebreakAge ?? ''}
                                 onChange={e => handleAgeChange(team.id, e.target.value === '' ? undefined : Number(e.target.value))}
+                                onBlur={() => {
+                                  if (tiebreakAges[team.id] !== undefined && onConfirmTiebreaker) {
+                                    onConfirmTiebreaker({ [team.id]: tiebreakAges[team.id] });
+                                  }
+                                }}
                                 style={{
                                   width: '72px',
                                   padding: '2px 6px',
@@ -299,7 +311,7 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                 })}
 
                 {/* Confirm tiebreaker button */}
-                {isAdmin && allTiedTeamsFinished && tiedIds.size > 0 && !tieAlreadyConfirmed && (
+                {isAdmin && tiedIds.size > 0 && !tieAlreadyConfirmed && (
                   <div style={{ padding: '8px 12px', borderTop: '1px solid rgba(255,155,85,0.3)' }}>
                     <button
                       onClick={() => confirmTiebreaker(tiedIds, onConfirmTiebreaker)}
@@ -317,7 +329,7 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                     </button>
                   </div>
                 )}
-                {isAdmin && allTiedTeamsFinished && tieAlreadyConfirmed && (
+                {isAdmin && tieAlreadyConfirmed && (
                   <div style={{ padding: '6px 12px', fontSize: '0.72rem', color: '#4caf50', textAlign: 'center' }}>
                     ✅ 나이 순위 확정 완료 — 브라켓 슬롯이 자동 업데이트됩니다
                   </div>
@@ -346,6 +358,13 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
             
             // Sort strictly by Wildcard tiebreakers: 1. Points, 2. Wins, 3. GoalDiff, 4. TiebreakAge/Age
             thirdPlacers.sort((a, b) => {
+              const getGroupNum = (team) => parseInt(String(team.group_id || team.initial_group || "").replace(/[^0-9]/g, ''), 10);
+              const isAGroup1 = getGroupNum(a) === 1;
+              const isBGroup1 = getGroupNum(b) === 1;
+              
+              if (isAGroup1 && !isBGroup1) return -1;
+              if (isBGroup1 && !isAGroup1) return 1;
+
               if (b.pts !== a.pts) return b.pts - a.pts;
               if (b.wins !== a.wins) return b.wins - a.wins;
               if (b.goalDiff !== a.goalDiff) return b.goalDiff - a.goalDiff;
@@ -405,8 +424,8 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                     {p2 && <div className="sc-name2">{p2}</div>}
                     {team.club && <div className="sc-club" style={{ color: getClubColor(team.club) }}>{team.club}</div>}
                     
-                    {/* Admin tiebreaker age input for Wildcards (only for teams that finished 3 matches) */}
-                    {isAdmin && tiedIds.has(team.id) && played === 3 && (() => {
+                    {/* Admin tiebreaker age input for Wildcards */}
+                    {isAdmin && tiedIds.has(team.id) && (() => {
                       const ageEntered = tiebreakAges[team.id] !== undefined;
                       return (
                         <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginTop: '5px' }}>
@@ -421,8 +440,13 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                           <input
                             type="number"
                             placeholder="예: 140"
-                            value={tiebreakAges[team.id] ?? ''}
+                            value={tiebreakAges[team.id] ?? team.tiebreakAge ?? ''}
                             onChange={e => handleAgeChange(team.id, e.target.value === '' ? undefined : Number(e.target.value))}
+                            onBlur={() => {
+                              if (tiebreakAges[team.id] !== undefined && onConfirmTiebreaker) {
+                                onConfirmTiebreaker({ [team.id]: tiebreakAges[team.id] });
+                              }
+                            }}
                             style={{
                               width: '72px',
                               padding: '2px 6px',
@@ -451,21 +475,6 @@ const Standings = ({ teams, groups, matches, isAdmin, onAdminAction, onConfirmTi
                 {(() => {
                   const tiedGroup = buttonPlacementMap[team.id];
                   if (tiedGroup && isAdmin) {
-                     // Check if all tied teams' groups are fully completed
-                     const tiedGroupsDone = tiedGroup.every(t => {
-                         const gn = String(t.group_id || t.initial_group || '').replace('조', '');
-                         const gm = (matches || []).filter(m => String(m.group_id).replace('조', '') === gn);
-                         return gm.length > 0 && gm.every(m => m.status === 'COMPLETED');
-                     });
-
-                     if (!tiedGroupsDone) {
-                         return (
-                             <div className="tied-group-action" style={{ background: 'rgba(0,0,0,0.2)', padding: '10px', textAlign: 'center', fontSize: '0.8rem', color: '#ff9b55' }}>
-                                 ⏳ 해당 팀들의 모든 예선 경기가 종료되어야 나이순위 확정이 가능합니다.
-                             </div>
-                         );
-                     }
-
                      const groupIds = tiedGroup.map(t => t.id);
                      const allAgesEntered = groupIds.every(id => tiebreakAges[id] !== undefined);
                      const tieAlreadyConfirmed = groupIds.every(id => {

@@ -183,14 +183,19 @@ function App() {
                 if (assignDebounceRef.current) clearTimeout(assignDebounceRef.current);
                 
                 // Capture the current snapshot data in closure
-                const capturedData = { matches: [...newData.matches], courts: [...newData.courts] };
+                const capturedData = { 
+                    matches: [...newData.matches], 
+                    courts: [...newData.courts],
+                    settings: newData.settings || {} 
+                };
                 // document.title = "T-SET";
                 
                 assignDebounceRef.current = setTimeout(async () => {
                     // document.title = "T-FIRE";
                     console.log(`[AutoAssign Timer Fired]`);
                     try {
-                        const { matches: nextMatches, courts: nextCourts } = assignMatchesToCourts(capturedData.matches, capturedData.courts);
+                        const allow16 = capturedData.settings?.tournament_state?.allow16 === true;
+                        const { matches: nextMatches, courts: nextCourts } = assignMatchesToCourts(capturedData.matches, capturedData.courts, allow16);
                         
                         // Extract only the courts and matches that actually changed to save Firebase writes
                         const changedCourts = nextCourts.filter(c => c.match_id !== capturedData.courts.find(oc => oc.id === c.id)?.match_id);
@@ -740,16 +745,34 @@ function App() {
                                 }
                             });
                             
+                            const getGroupNumStr = (team) => {
+                                let groupStr = team.initial_group || team.group_id || team.group || team.originalGroup || "";
+                                return parseInt(String(groupStr).replace(/[^0-9]/g, ''), 10);
+                            };
+                            const otherThirds = thirdPlacers.filter(t => getGroupNumStr(t) !== 1);
+                            otherThirds.sort((a,b) => {
+                                if (b.pts !== a.pts) return b.pts - a.pts;
+                                if (b.wins !== a.wins) return b.wins - a.wins;
+                                return (b.goalDiff || 0) - (a.goalDiff || 0);
+                            });
+
+                            const cutoffSet = new Set(otherThirds.slice(0, 7).map(t => t.id));
+
                             Object.values(byStats).forEach(group => {
                                 if (group.length > 1) {
-                                    const anyMissing = group.some(t => t.tiebreakAge === undefined);
-                                    if (anyMissing) {
-                                        group.forEach(t => unresolvedTies.add(t.id));
-                                    } else {
-                                        const ages = group.map(t => t.tiebreakAge);
-                                        const uniqueAges = new Set(ages);
-                                        if (uniqueAges.size !== ages.length) {
+                                    // 해당 그룹 중 와일드카드 선발권(상위 7팀)에 한 팀이라도 걸려있을 때만 동점자 처리
+                                    const affectsWildcards = group.some(t => cutoffSet.has(t.id));
+
+                                    if (affectsWildcards) {
+                                        const anyMissing = group.some(t => t.tiebreakAge === undefined);
+                                        if (anyMissing) {
                                             group.forEach(t => unresolvedTies.add(t.id));
+                                        } else {
+                                            const ages = group.map(t => t.tiebreakAge);
+                                            const uniqueAges = new Set(ages);
+                                            if (uniqueAges.size !== ages.length) {
+                                                group.forEach(t => unresolvedTies.add(t.id));
+                                            }
                                         }
                                     }
                                 }

@@ -1,7 +1,7 @@
 import React from 'react';
 import MatchCard from './MatchCard';
 
-const KnockoutTree = ({ matches, teams, courts, isAdmin, activeTabId }) => {
+const KnockoutTree = ({ matches, teams, isAdmin, activeTabId }) => {
     const getTeam = (id) => teams.find(t => t.id === id) || { id: 'TBD', name: 'TBD', player1: '', player2: '' };
 
     // Get knockout matches 
@@ -72,7 +72,7 @@ const KnockoutTree = ({ matches, teams, courts, isAdmin, activeTabId }) => {
                 {columnMatches.map((match, mIndex) => (
                     <div key={match.id} className="tree-match-node">
                         <div className="tree-match-card-wrapper">
-                            <MatchCard match={match} teamA={getTeam(match.team_a_id)} teamB={getTeam(match.team_b_id)} isAdmin={isAdmin} allMatches={matches} courts={courts} />
+                            <MatchCard match={match} teamA={getTeam(match.team_a_id)} teamB={getTeam(match.team_b_id)} isAdmin={isAdmin} allMatches={matches} />
                         </div>
                     </div>
                 ))}
@@ -169,7 +169,7 @@ const KnockoutTree = ({ matches, teams, courts, isAdmin, activeTabId }) => {
                                 <div className="tree-match-list final-match">
                                     <div className="tree-match-node center-node">
                                         <div className="tree-match-card-wrapper">
-                                            <MatchCard match={finals[0]} teamA={getTeam(finals[0].team_a_id)} teamB={getTeam(finals[0].team_b_id)} isAdmin={isAdmin} allMatches={matches} courts={courts} />
+                                            <MatchCard match={finals[0]} teamA={getTeam(finals[0].team_a_id)} teamB={getTeam(finals[0].team_b_id)} isAdmin={isAdmin} allMatches={matches} />
                                         </div>
                                     </div>
                                 </div>

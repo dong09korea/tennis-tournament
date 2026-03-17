@@ -1,3 +1,16 @@
-[36mvite v5.4.21 [32mbuilding for production...[36m[39m
-transforming...
-[32m✓[39m 66 modules transformed.
+Group 5 unfinished matches: []
+Group 10 unfinished matches: []
+Group 4 unfinished matches: []
+Group 7 unfinished matches: []
+Group 2 unfinished matches: []
+Group 11 unfinished matches: []
+Group 8 unfinished matches: []
+Group 9 unfinished matches: []
+Group 3 unfinished matches: []
+Group 1 unfinished matches: []
+Group 6 unfinished matches: []
+Group 12 unfinished matches: []
+Unresolved due to unfinished groups: []
+Unresolved due to duplicate tiebreakAge [ '이성철/이다경', '정대현/김선경', '김동호/나츠미' ] [ 170, 150, 150 ]
+Unresolved due to duplicate tiebreakAge [ '조명화/이재은', '서동찬/김태희' ] [ 100, 100 ]
+Total unresolved: [ 't15', 't44', 't4', 't13', 't25' ]

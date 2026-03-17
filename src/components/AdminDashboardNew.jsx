@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { generateGroups, generateSchedule, assignMatchesToCourts, calculateStandings, getTop32Teams, generateBracket32, updateTournamentProgression } from '../utils/tournamentLogic';
-import { uploadData, updateMatch, updateCourt, resetTournamentData } from '../services/firebase';
+import { uploadData, updateMatch, updateCourt, resetTournamentData, updateSettings } from '../services/firebase';
 import { QRCodeSVG } from 'qrcode.react';
 import * as XLSX from 'xlsx';
 import MatchCard from './MatchCard';
@@ -228,8 +228,13 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
 
     // --- Generation Logic ---
     const handleGenerate = async (skipConfirm = false) => {
-        // Filter valid teams (must have names)
-        const validRows = gridData.filter(r => r.p1_name && r.p2_name);
+        // Filter valid teams (must have names) and forcefully exclude any "불참" teams so they never enter the logic
+        const validRows = gridData.filter(r => 
+            r.p1_name && r.p2_name && 
+            !r.p1_name.includes("불참") && 
+            !r.p2_name.includes("불참") && 
+            !(r.club && r.club.includes("불참"))
+        );
 
         if (!skipConfirm && validRows.length === 0) {
             alert("참가자 명단을 입력해주세요. (최소한 이름1, 이름2는 필수입니다)");
@@ -263,22 +268,6 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
             const sortedTeams = [...teams].sort((a, b) => (a.drawOrder ?? 9999) - (b.drawOrder ?? 9999));
             const groups = generateGroups(sortedTeams, numGroups);
             const matches = generateSchedule(groups);
-
-            // --- SPECIAL PROCESSING: Auto-complete matches against the "Absent" team ---
-            matches.forEach(m => {
-                const teamA = teams.find(t => t.id === m.team_a_id);
-                const teamB = teams.find(t => t.id === m.team_b_id);
-                
-                const isAbsentA = teamA && (teamA.name.includes("불참") || teamA.club === "불참" || teamA.name === "1조 1번팀");
-                const isAbsentB = teamB && (teamB.name.includes("불참") || teamB.club === "불참" || teamB.name === "1조 1번팀");
-                
-                if (isAbsentA || isAbsentB) {
-                    m.status = 'COMPLETED';
-                    m.score_a = isAbsentA ? 0 : 6;
-                    m.score_b = isAbsentB ? 0 : 6;
-                    m.winner_id = isAbsentA ? m.team_b_id : m.team_a_id;
-                }
-            });
 
             const courts = Array.from({ length: numCourts }, (_, i) => ({
                 id: i + 1,
@@ -799,36 +788,6 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
         // Take exactly bucketSize teams for this seed's turn (or fewer if not enough left)
         let seedTeams = unassignedValidTeams.slice(0, bucketSize);
 
-        // --- SPECIAL RULE: Force Group 1, Team 1 to be 'Absent' (불참) if Seed 1 lottery is clicked ---
-        if (seedVal === 1) {
-            // Find if there's an 'Absent' team already or create one logically
-            // We'll replace the first team in seedTeams with the "불참" data
-            // BUT we want to make sure it ends up in Group 1.
-            const absentTeam = {
-                originalIdx: -1, // We'll find or hijack an index
-                p1_name: '불참',
-                p2_name: '불참',
-                club: '불참',
-                group: '1조'
-            };
-
-            // Check if there's already a row labeled "불참" in gridData
-            const existingAbsentIdx = gridData.findIndex(r => r.p1_name === '불참' || r.club === '불참');
-            
-            if (existingAbsentIdx !== -1) {
-                absentTeam.originalIdx = existingAbsentIdx;
-                // Remove this specific team from unassigned if it was there
-                seedTeams = seedTeams.filter(t => t.originalIdx !== existingAbsentIdx);
-                // Prepend it so it's handled first
-                seedTeams.unshift({ ...gridData[existingAbsentIdx], originalIdx: existingAbsentIdx });
-            } else {
-                // If no "불참" row exists, hijack the very first unassigned team slot for it
-                const hijacked = seedTeams[0];
-                absentTeam.originalIdx = hijacked.originalIdx;
-                seedTeams[0] = absentTeam;
-            }
-        }
-
         // Group currently assigned teams
         const currentGroups = Array.from({ length: numGroups }, () => []);
         gridData.forEach((r, i) => {
@@ -863,21 +822,6 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
 
             // Randomize the order we place the teams in this attempt to avoid getting stuck
             let teamsToAssign = seedTeams.map((t, i) => ({ team: t, origIndex: i }));
-            
-            // --- FIX: PRE-ASSIGN ABSENT TEAM BEFORE ANY OTHER TEAMS ---
-            // Remove the absent team from the pool so no one else can steal Group 1
-            if (seedVal === 1) {
-                const absentTeamIndex = teamsToAssign.findIndex(t => t.origIndex === 0);
-                if (absentTeamIndex !== -1) {
-                    const absentTeamMeta = teamsToAssign.splice(absentTeamIndex, 1)[0];
-                    const targetGIdx = 0;
-                    const sIdx = currentSlots.indexOf(targetGIdx);
-                    if (sIdx !== -1) {
-                        attemptAssignment.push({ origIndex: absentTeamMeta.origIndex, gIdx: targetGIdx });
-                        currentSlots.splice(sIdx, 1);
-                    }
-                }
-            }
 
             for (let i = teamsToAssign.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
@@ -947,11 +891,6 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
 
         // Apply best found assignment. We need to guarantee that teams picked in earlier seeds 
         // ALWAYS have a lower drawOrder than teams picked in later seeds.
-        
-        // --- FORCE ABSENT TEAM ORDER ---
-        // To ensure the "Absent" team (origIndex === 0) remains the FIRST team in Group 1,
-        // it must have the absolute lowest drawOrder in this seed batch.
-        // We do this by sorting the assignment by origIndex before applying drawOrder.
         const sortedAssignment = seedTeams.map((t, i) => ({ team: t, gIdx: bestAssignment[i], origIndex: i }));
         sortedAssignment.sort((a, b) => a.origIndex - b.origIndex);
 
@@ -1064,8 +1003,9 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                 promises.push(updateCourt(court.id, { match_id: match.id }));
             }
 
+            await updateSettings('tournament_state', { allow16: true });
             if (promises.length === 0) {
-                alert('배정 가능한 경기가 없습니다. 팀 중복이나 코트 상태를 확인해주세요.');
+                alert('16강 배정 제한만 해제되었습니다. 자동 배정을 기다려주세요.');
                 setIsProcessing(false);
                 return;
             }
@@ -1698,46 +1638,82 @@ const AdminDashboardNew = forwardRef(({ data, onUpdateData, isAdmin, onLogin, nu
                                 </div>
 
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                                    {[...data.matches]
-                                        .filter(m => {
-                                            if (activeManageTab === '전체') return true;
-                                            if (activeManageTab === '예선 조별리그') return typeof m.group_id === 'number' || (typeof m.group_id === 'string' && m.group_id.includes('조'));
-                                            if (activeManageTab === '본선 32강') return m.group_id === '본선 32강';
-                                            // 16강~결승: '본선 16강', '16강', '본선 16강 (무작위)' 등 모두 포함
-                                            if (activeManageTab === '16강') return ['본선 16강', '16강', '본선 16강 (무작위)'].includes(m.group_id);
-                                            if (activeManageTab === '8강')  return ['본선 8강',  '8강'].includes(m.group_id);
-                                            if (activeManageTab === '4강')  return ['본선 4강',  '4강'].includes(m.group_id);
-                                            if (activeManageTab === '결승')  return ['본선 결승', '결승'].includes(m.group_id);
-                                            return m.group_id === activeManageTab;
-                                        })
-                                        .sort((a, b) => {
-                                            // 1. Sort by Status (LIVE > PENDING > COMPLETED)
-                                            const statusOrder = { 'LIVE': 1, 'PENDING': 2, 'SCHEDULED': 2, 'COMPLETED': 3 };
-                                            const sA = statusOrder[a.status] || 4;
-                                            const sB = statusOrder[b.status] || 4;
-                                            if (sA !== sB) return sA - sB;
+                                    {(() => {
+                                        const filteredMatches = [...data.matches]
+                                            .filter(m => {
+                                                if (activeManageTab === '전체') return true;
+                                                if (activeManageTab === '예선 조별리그') return typeof m.group_id === 'number' || (typeof m.group_id === 'string' && m.group_id.includes('조'));
+                                                if (activeManageTab === '본선 32강') return m.group_id === '본선 32강';
+                                                if (activeManageTab === '16강') return ['본선 16강', '16강', '본선 16강 (무작위)'].includes(m.group_id);
+                                                if (activeManageTab === '8강')  return ['본선 8강',  '8강'].includes(m.group_id);
+                                                if (activeManageTab === '4강')  return ['본선 4강',  '4강'].includes(m.group_id);
+                                                if (activeManageTab === '결승')  return ['본선 결승', '결승'].includes(m.group_id);
+                                                return m.group_id === activeManageTab;
+                                            })
+                                            .sort((a, b) => {
+                                                // 1. Sort by Status (LIVE > PENDING > COMPLETED)
+                                                const statusOrder = { 'LIVE': 1, 'PENDING': 2, 'SCHEDULED': 2, 'COMPLETED': 3 };
+                                                const sA = statusOrder[a.status] || 4;
+                                                const sB = statusOrder[b.status] || 4;
+                                                if (sA !== sB) return sA - sB;
 
-                                            // 2. Sort by Group/Round
-                                            if (a.group_id !== b.group_id) {
-                                                const parseGroup = g => parseInt(String(g).replace(/[^0-9]/g, '') || 999);
-                                                return parseGroup(a.group_id) - parseGroup(b.group_id);
-                                            }
-                                            return a.round - b.round;
-                                        })
-                                        .map(match => {
-                                            const getTeam = (id) => data.teams.find(t => t.id === id) || { id: 'TBD', name: 'TBD', player1: '', player2: '' };
-                                            return (
-                                                <MatchCard
-                                                    key={match.id}
-                                                    match={match}
-                                                    teamA={getTeam(match.team_a_id)}
-                                                    teamB={getTeam(match.team_b_id)}
-                                                    isAdmin={true}
-                                                    allMatches={data.matches}
-                                                    courts={data.courts}
-                                                />
-                                            );
-                                        })}
+                                                // 2. Sort by Group/Round
+                                                if (a.group_id !== b.group_id) {
+                                                    const parseGroup = g => parseInt(String(g).replace(/[^0-9]/g, '') || 999);
+                                                    return parseGroup(a.group_id) - parseGroup(b.group_id);
+                                                }
+                                                return a.round - b.round;
+                                            });
+
+                                        const getTeam = (id) => data.teams.find(t => t.id === id) || { id: 'TBD', name: 'TBD', player1: '', player2: '' };
+
+                                        if (activeManageTab === '예선 조별리그') {
+                                            const grouped = {};
+                                            filteredMatches.forEach(m => {
+                                                const g = typeof m.group_id === 'number' ? `${m.group_id}조` : m.group_id;
+                                                if (!grouped[g]) grouped[g] = [];
+                                                grouped[g].push(m);
+                                            });
+                                            const sortedGroups = Object.keys(grouped).sort((a,b) => {
+                                                const numA = parseInt(a.replace(/[^0-9]/g, '')) || 999;
+                                                const numB = parseInt(b.replace(/[^0-9]/g, '')) || 999;
+                                                return numA - numB;
+                                            });
+
+                                            return sortedGroups.map(group => (
+                                                <div key={group} style={{ marginBottom: '1.5rem', background: 'rgba(0,0,0,0.2)', padding: '1rem', borderRadius: '12px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                                                    <h4 style={{ color: 'var(--tennis-yellow)', marginBottom: '1rem', fontSize: '1.1rem', borderBottom: '1px solid rgba(213,255,0,0.2)', paddingBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                                        <span style={{ fontSize: '1.2em' }}>📋</span> {group} 경기 목록
+                                                    </h4>
+                                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                                        {grouped[group].map(match => (
+                                                            <MatchCard
+                                                                key={match.id}
+                                                                match={match}
+                                                                teamA={getTeam(match.team_a_id)}
+                                                                teamB={getTeam(match.team_b_id)}
+                                                                isAdmin={true}
+                                                                allMatches={data.matches}
+                                                                courts={data.courts}
+                                                            />
+                                                        ))}
+                                                    </div>
+                                                </div>
+                                            ));
+                                        }
+
+                                        return filteredMatches.map(match => (
+                                            <MatchCard
+                                                key={match.id}
+                                                match={match}
+                                                teamA={getTeam(match.team_a_id)}
+                                                teamB={getTeam(match.team_b_id)}
+                                                isAdmin={true}
+                                                allMatches={data.matches}
+                                                courts={data.courts}
+                                            />
+                                        ));
+                                    })()}
                                     {data.matches.length === 0 && (
                                         <div style={{ padding: '2rem', textAlign: 'center', color: '#888' }}>
                                             생성된 경기가 없습니다. [대회 운영 설정] 탭에서 대진표를 먼저 생성해주세요.

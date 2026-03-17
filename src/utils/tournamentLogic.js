@@ -166,7 +166,7 @@ const FIXED_COURT_SCHEDULE = {
 
 // Assign Matches to Courts
 // Returns updated { matches, courts }
-export const assignMatchesToCourts = (matches, courts) => {
+export const assignMatchesToCourts = (matches, courts, allow16 = false) => {
     // Deep copy to avoid mutation issues during calculation
     let nextMatches = JSON.parse(JSON.stringify(matches));
     let nextCourts = JSON.parse(JSON.stringify(courts));
@@ -195,8 +195,22 @@ export const assignMatchesToCourts = (matches, courts) => {
     if (emptyCourts.length === 0) return { matches: nextMatches, courts: nextCourts };
 
     // 3. Keep a dynamic fallback queue ONLY for matches that are not in the fixed schedule (e.g., knockouts)
-    // -> DISABLED: Users requested MANUAL assignment for 32강 and beyond.
-    let pendingKnockoutMatches = [];
+    let pendingKnockoutMatches = nextMatches.filter(m =>
+        m.status === 'PENDING' &&
+        !m.court_id &&
+        m.team_a_id !== 'TBD' && m.team_a_id !== 'BYE' &&
+        m.team_b_id !== 'TBD' && m.team_b_id !== 'BYE' &&
+        !isGroupMatch(m) // Only pull knockout/final matches dynamically
+    );
+
+    // Apply strict block for 16강+ if allow16 flag is false. 
+    // This allows 32강 to auto-assign, but holds matches beyond 32강 until admin starts them.
+    if (!allow16) {
+        pendingKnockoutMatches = pendingKnockoutMatches.filter(m => {
+            const g = String(m.group_id);
+            return g.includes('32'); // Only allow 32강 to flow automatically
+        });
+    }
 
     // Sort by round ascending so earlier matches get priority
     pendingKnockoutMatches.sort((a, b) => a.round - b.round);
@@ -218,11 +232,23 @@ export const assignMatchesToCourts = (matches, courts) => {
 
                 if (scheduledMatch) {
                     if (scheduledMatch.status !== 'COMPLETED') {
+                        // NEW: Ensure neither team has an earlier incomplete match in this same group
+                        // to enforce sequential round schedules for teams (e.g. Round 2 matches won't start before Round 1 matches).
+                        const hasPendingEarlierMatches = nextMatches.some(m =>
+                            isGroupMatch(m) &&
+                            getGroupNum(m.group_id) === item.g &&
+                            m.match_in_group < item.m &&
+                            m.status !== 'COMPLETED' &&
+                            (m.team_a_id === scheduledMatch.team_a_id || m.team_b_id === scheduledMatch.team_a_id ||
+                             m.team_a_id === scheduledMatch.team_b_id || m.team_b_id === scheduledMatch.team_b_id)
+                        );
+
                         // Priority 1: If ready, assign immediately and move to next court
                         if (scheduledMatch.status === 'PENDING' &&
                             !scheduledMatch.court_id &&
                             !busyTeams.has(scheduledMatch.team_a_id) &&
                             !busyTeams.has(scheduledMatch.team_b_id) &&
+                            !hasPendingEarlierMatches &&
                             scheduledMatch.team_a_id !== 'TBD' && scheduledMatch.team_a_id !== 'BYE' &&
                             scheduledMatch.team_b_id !== 'TBD' && scheduledMatch.team_b_id !== 'BYE') 
                         {
@@ -242,9 +268,9 @@ export const assignMatchesToCourts = (matches, courts) => {
                             break;
                         }
 
-                        // Priority 3: If PENDING but NOT READY (busy teams), DO NOT block.
-                        // Instead, continue searching the rest of the fixed queue for this court.
-                        // This avoids idle time if the intended match is waiting for a team.
+                        // Priority 3: Strictly enforce fixed schedule. 
+                        // If this match is not completed, we MUST wait for it. No skipping allowed.
+                        break;
                     }
                 }
             }
@@ -252,27 +278,28 @@ export const assignMatchesToCourts = (matches, courts) => {
 
         // 4.2. Fallback to Dynamic Queue (Knockouts OR fully finished containers)
         if (!courtAssigned) {
-            // Find any match that is ready to play (not blocked by fixed schedule/busy teams)
-            // User said: "If court 1 is finished, fill matches automatically"
-            const candidateIndex = nextMatches.findIndex(m =>
-                m.status === 'PENDING' &&
-                !m.court_id &&
-                m.team_a_id !== 'TBD' && m.team_a_id !== 'BYE' &&
-                m.team_b_id !== 'TBD' && m.team_b_id !== 'BYE' &&
+            // Find any match from our filtered knockout queue that is ready to play
+            const candidateIndex = pendingKnockoutMatches.findIndex(m =>
                 !busyTeams.has(m.team_a_id) && !busyTeams.has(m.team_b_id)
             );
 
             if (candidateIndex !== -1) {
-                const match = nextMatches[candidateIndex];
+                const matchToPlay = pendingKnockoutMatches[candidateIndex];
+                // Remove from pending so another court doesn't pick it
+                pendingKnockoutMatches.splice(candidateIndex, 1);
 
-                match.status = 'LIVE';
-                match.court_id = court.id;
-                
-                court.match_id = match.id;
+                // Find the actual match reference in nextMatches and update it
+                const actualMatch = nextMatches.find(m => m.id === matchToPlay.id);
+                if (actualMatch) {
+                    actualMatch.status = 'LIVE';
+                    actualMatch.court_id = court.id;
+                    
+                    court.match_id = actualMatch.id;
 
-                busyTeams.add(match.team_a_id);
-                busyTeams.add(match.team_b_id);
-                courtAssigned = true;
+                    busyTeams.add(actualMatch.team_a_id);
+                    busyTeams.add(actualMatch.team_b_id);
+                    courtAssigned = true;
+                }
             }
         }
     }
@@ -295,7 +322,7 @@ export const calculateStandings = (teams, matches) => {
             wins: 0,
             draws: 0,
             losses: 0,
-            pts: 0,          // Win=2pts, Draw=1pt
+            pts: 0,          // Win=3pts, Draw=1pt
             gamesWon: 0,     // Total game/set points won across all matches
             pointsFor: 0,
             pointsAgainst: 0,
@@ -311,6 +338,9 @@ export const calculateStandings = (teams, matches) => {
         if (isGroupStage) {
             if (stats[m.team_a_id]) stats[m.team_a_id].group_id = m.group_id;
             if (stats[m.team_b_id]) stats[m.team_b_id].group_id = m.group_id;
+        } else {
+            // Ignore knockout matches when calculating group standings
+            return;
         }
 
         if (m.status === 'COMPLETED') {
@@ -361,7 +391,9 @@ export const calculateStandings = (teams, matches) => {
 
     // Group teams and sort
     const grouped = {};
-    Object.values(stats).forEach(team => {
+    Object.values(stats)
+      .filter(team => !String(team.name).includes('불참') && team.club !== '불참')
+      .forEach(team => {
         let rawGName = team.group_id || team.group || team.initial_group || "Unknown";
         // Normalize: if it's a number like 1, or string "1", make it "1조" to prevent split duplicates
         let gName = rawGName;
@@ -491,78 +523,9 @@ export const getTop32Teams = (groupedStandings) => {
     return top32;
 };
 
-// Assign wildcards using backtracking to avoid same-group matchups
-const assignWildcards = (wildcardTeams, exactBracketSlots) => {
-    // exactBracketSlots: array of objects { idx, opponent, expectedW }
-    const assignedSlots = new Array(8).fill(null);
-    const usedWildcards = new Set();
-
-    const getGroupNum = (team) => {
-        if (!team) return null;
-        let groupStr = team.initial_group || team.group_id || team.group || "";
-        return parseInt(String(groupStr).replace(/[^0-9]/g, ''), 10);
-    };
-
-    // The sequential order of wildcards for the "shift to next rank" logic
-    const wRanks = [1, 2, 3, 4, 5, 6, 7, '1조3등'];
-    
-    // Create a map for quick lookup
-    const wMap = {};
-    wildcardTeams.forEach(t => {
-        wMap[t.wildcardRank] = t;
-    });
-
-    const backtrack = (slotIdx) => {
-        if (slotIdx === 8) return true; // All 8 wildcards assigned successfully
-
-        const slot = exactBracketSlots[slotIdx];
-        const opponentGroup = getGroupNum(slot.opponent);
-
-        // Find where the slot's expected 'w' is in the sequence
-        const startIdx = wRanks.indexOf(slot.expectedW);
-        
-        // Generate preference order: expectedW -> next -> next ... wrap around
-        const preferredRanks = [];
-        if (startIdx !== -1) {
-            for (let i = 0; i < 8; i++) {
-                preferredRanks.push(wRanks[(startIdx + i) % 8]);
-            }
-        } else {
-            // Fallback just in case
-            preferredRanks.push(...wRanks);
-        }
-
-        for (const wRank of preferredRanks) {
-            const wTeam = wMap[wRank];
-            if (!wTeam) continue; // Should not happen if exactly 8 valid teams
-
-            if (usedWildcards.has(wTeam.id)) continue;
-
-            const wGroup = getGroupNum(wTeam);
-
-            // Constraint: Wildcard team cannot face a team from the same group
-            if (opponentGroup !== wGroup) {
-                // Try assigning
-                assignedSlots[slotIdx] = wTeam;
-                usedWildcards.add(wTeam.id);
-
-                if (backtrack(slotIdx + 1)) return true;
-
-                // Undo
-                assignedSlots[slotIdx] = null;
-                usedWildcards.delete(wTeam.id);
-            }
-        }
-        return false;
-    };
-
-    if (!backtrack(0)) {
-        console.warn("Could not find a perfect wildcard assignment constraint. Falling back.");
-        return wildcardTeams; // Just return them sequentially
-    }
-
-    return assignedSlots;
-};
+// The user specified exact mappings for wildcards (W1~W7, and W1조3등).
+// We no longer use fallback backtracking to avoid same-group matches; 
+// we simply enforce the requested fixed bracket map unconditionally.
 
 // ─── Shared fixed bracket layout ────────────────────────────────────────────
 // Describes which group rank fills each of the 16 first-round match slots.
@@ -716,18 +679,16 @@ export const generateBracket32 = (top32Teams, groupedStandings) => {
         if (matchDef.b.g === 'W') wildcardSlots.push({ idx, opponent: getTeam(matchDef.a), expectedW: matchDef.b.w });
     });
 
-    // Run backtracking to safely place wildcards
-    let assignedWildcards = [];
-    if (wildcards.length === 8) {
-        assignedWildcards = assignWildcards(wildcards, wildcardSlots);
-    } else if (wildcards.length > 0) {
-        assignedWildcards = wildcards; // fallback if not exactly 8
-    }
-
-    // We map back to the wildcardSlots
+    // Map the resolved wildcards exactly per the layout rules using wildcardRank
     const assignedWildcardMap = {}; // matchIdx -> Assigned Wildcard Team
-    wildcardSlots.forEach((slot, wIdx) => {
-        assignedWildcardMap[slot.idx] = assignedWildcards[wIdx] || { id: 'BYE', name: 'BYE', player1: 'BYE' };
+    const wMap = {};
+    wildcards.forEach(t => {
+        if (t.wildcardRank) wMap[t.wildcardRank] = t;
+    });
+
+    wildcardSlots.forEach((slot) => {
+        const matchingTeam = wMap[slot.expectedW];
+        assignedWildcardMap[slot.idx] = matchingTeam || { id: 'BYE', name: 'BYE', player1: 'BYE' };
     });
 
     // 4. Construct matches in order

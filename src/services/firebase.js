@@ -21,7 +21,8 @@ const COLLECTIONS = {
     MATCHES: "tennis_matches",
     TEAMS: "tennis_teams",
     GROUPS: "tennis_groups",
-    COURTS: "tennis_courts"
+    COURTS: "tennis_courts",
+    SETTINGS: "tennis_settings"
 };
 
 export const subscribeToData = (onDataUpdate) => {
@@ -64,11 +65,20 @@ export const subscribeToData = (onDataUpdate) => {
         }
     });
 
+    const unsubscribeSettings = onSnapshot(collection(db, COLLECTIONS.SETTINGS), (snapshot) => {
+        const settings = {};
+        snapshot.docs.forEach(doc => {
+            settings[doc.id] = doc.data();
+        });
+        onDataUpdate(prev => ({ ...prev, settings }));
+    });
+
     return () => {
         unsubscribeMatches();
         unsubscribeTeams();
         unsubscribeGroups();
         unsubscribeCourts();
+        unsubscribeSettings();
     };
 };
 
@@ -160,6 +170,16 @@ export const updateTeam = async (teamId, updates) => {
         await setDoc(teamRef, updates, { merge: true });
     } catch (error) {
         console.error("Error updating team: ", error);
+        throw error;
+    }
+};
+
+export const updateSettings = async (settingsId, updates) => {
+    try {
+        const settingsRef = doc(db, COLLECTIONS.SETTINGS, settingsId);
+        await setDoc(settingsRef, updates, { merge: true });
+    } catch (error) {
+        console.error("Error updating settings: ", error);
         throw error;
     }
 };

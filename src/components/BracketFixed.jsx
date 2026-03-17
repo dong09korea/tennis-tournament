@@ -100,9 +100,10 @@ const BracketFixed = ({ matches, teams, courts, isAdmin, numCourts, activeTab })
                                 }
 
                                 // Is tiebreak (knockout 5:5)
+                                const isGroupMatch = match && (typeof match.group_id === 'number' || (typeof match.group_id === 'string' && match.group_id.includes('조')) || /^\d+$/.test(String(match.group_id)));
                                 const isKnockoutTb = match && isLive &&
                                     (match.score_a === 5 && match.score_b === 5) &&
-                                    !/^\d+조$/.test(String(match.group_id));
+                                    !isGroupMatch;
 
                                 const winnerName = isCompleted && match?.winner_id
                                     ? (match.winner_id === match.team_a_id ? teamA?.name : teamB?.name)
@@ -171,7 +172,7 @@ const BracketFixed = ({ matches, teams, courts, isAdmin, numCourts, activeTab })
 
                     <div className="bracket-container">
                         {activeTabId !== 'group' && (
-                            <KnockoutTree matches={matches} teams={teams} courts={courts} isAdmin={isAdmin} rounds={rounds} activeTabId={activeTabId} />
+                            <KnockoutTree matches={matches} teams={teams} isAdmin={isAdmin} rounds={rounds} activeTabId={activeTabId} />
                         )}
                         {activeTabId === 'group' && groupMatches.length > 0 && (
                             <div className="bracket-round" style={{ minWidth: '100%', padding: '0 1rem' }}>

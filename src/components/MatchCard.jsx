@@ -306,8 +306,24 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches, courts }) => {
     <div className={`match-card ${isLive ? 'live' : ''} ${isCompleted ? 'completed' : ''}`}>
       <div className="card-header">
         <span className="match-info">
-          {match.group_id} - R{match.round}
-          {match.court_id ? ` (Court ${match.court_id})` : ''}
+          {(() => {
+            const isGroupNumeric = typeof match.group_id === 'number' || /^\d+$/.test(String(match.group_id));
+            const baseStageName = isGroupNumeric ? `${match.group_id}조` : match.group_id;
+            let matchSeq = '';
+            const parsedId = match.id?.match(/_m(\d+)$/);
+            if (parsedId) {
+                matchSeq = `${parsedId[1]}경기`;
+            } else if (match.round) {
+                matchSeq = `R${match.round}`;
+            }
+            const title = matchSeq ? `${baseStageName} ${matchSeq}` : baseStageName;
+            return (
+               <>
+                 {title}
+                 {match.court_id ? <span style={{ color: '#1de9b6', marginLeft: '6px', fontWeight: 'bold' }}>({match.court_id}번 코트)</span> : ''}
+               </>
+            );
+          })()}
         </span>
         <div style={{ display: 'flex', gap: '5px' }}>
           {isLive && <span className="live-badge">● 진행중</span>}
