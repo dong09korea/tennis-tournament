@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { updateMatch, updateCourt, uploadData } from '../services/firebase';
 import { updateTournamentProgression, FIXED_BRACKET_LAYOUT } from '../utils/tournamentLogic';
 
+const AUTO_ASSIGN_ROUNDS = new Set(['본선 32강']); // 자동 배정 단계 (32강까지)
 const isManualRound = (groupId) =>
     typeof groupId === 'string' &&
     !groupId.includes('조') &&
-    !/^\d+$/.test(groupId); // 본선 토너먼트는 모두 수동 배정
+    !/^\d+$/.test(groupId) &&
+    !AUTO_ASSIGN_ROUNDS.has(groupId); // 16강, 8강, 4강, 결승 모두 수동
 
 const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches, courts }) => {
   const [selectedCourt, setSelectedCourt] = useState('');
@@ -63,10 +65,18 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches, courts }) => {
   const isGroupStageMatch = (m) => typeof m.group_id === 'number' || (typeof m.group_id === 'string' && m.group_id.includes('조')) || /^\d+$/.test(String(m.group_id));
   const isKnockout = !isGroupStageMatch(match);
 
-  const handleScore = async (team, delta) => {
+  const handleScoreChange = async (team, scoreStr) => {
+    let score = 0;
+    if (scoreStr === '') {
+      score = 0; // Default to 0 instead of null if cleared to avoid weird math
+    } else {
+      score = parseInt(scoreStr, 10);
+      if (score < 0 || score > 6 || isNaN(score)) return;
+    }
+
     const field = team === 'A' ? 'score_a' : 'score_b';
-    const scoreA = team === 'A' ? Math.max(0, (match.score_a || 0) + delta) : (match.score_a || 0);
-    const scoreB = team === 'B' ? Math.max(0, (match.score_b || 0) + delta) : (match.score_b || 0);
+    const scoreA = team === 'A' ? score : (match.score_a || 0);
+    const scoreB = team === 'B' ? score : (match.score_b || 0);
 
     let updates = { [field]: team === 'A' ? scoreA : scoreB };
     let newWinnerId = null;
@@ -74,6 +84,12 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches, courts }) => {
     if (isCompleted) {
         if (scoreA > scoreB) newWinnerId = match.team_a_id;
         else if (scoreB > scoreA) newWinnerId = match.team_b_id;
+        else if (isKnockout && scoreA === scoreB && scoreA === 5) {
+            const tbA = match.tb_score_a || 0;
+            const tbB = match.tb_score_b || 0;
+            if (tbA > tbB) newWinnerId = match.team_a_id;
+            else if (tbB > tbA) newWinnerId = match.team_b_id;
+        }
         updates.winner_id = newWinnerId;
     }
 
@@ -91,6 +107,42 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches, courts }) => {
     }
   };
 
+  const handleTbScoreChange = async (team, tbScoreStr) => {
+    let tbScore = 0;
+    if (tbScoreStr === '') {
+        tbScore = 0;
+    } else {
+        tbScore = parseInt(tbScoreStr, 10);
+        if (tbScore < 0 || isNaN(tbScore)) return;
+    }
+
+    const field = team === 'A' ? 'tb_score_a' : 'tb_score_b';
+    const tbA = team === 'A' ? tbScore : (match.tb_score_a || 0);
+    const tbB = team === 'B' ? tbScore : (match.tb_score_b || 0);
+
+    let updates = { [field]: tbScore };
+    let newWinnerId = null;
+
+    if (isCompleted && match.score_a === match.score_b && match.score_a === 5 && isKnockout) {
+        if (tbA > tbB) newWinnerId = match.team_a_id;
+        else if (tbB > tbA) newWinnerId = match.team_b_id;
+        updates.winner_id = newWinnerId;
+    } else if (isCompleted) {
+        newWinnerId = match.winner_id; // Keep existing if score_a != score_b
+    }
+
+    await updateMatch(match.id, updates);
+
+    if (isCompleted && allMatches && newWinnerId) {
+        const nextMatchObj = allMatches.find(m => m.id === match.next_match_id);
+        if (nextMatchObj && newWinnerId !== match.winner_id) {
+            await updateMatch(nextMatchObj.id, {
+                [match.is_team_a_next ? 'team_a_id' : 'team_b_id']: newWinnerId
+            });
+        }
+    }
+  };
+
   const handleStatus = async (newStatus) => {
     let updates = { status: newStatus };
     let newWinnerId = null;
@@ -100,8 +152,18 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches, courts }) => {
         const scoreB = match.score_b || 0;
 
         if (isKnockout && scoreA === scoreB) {
-            alert('본선 토너먼트는 무승부가 없습니다. 승패(타이브레이크 결과 등)를 실시간 점수판에서 입력하시거나, 임의로 승자의 점수를 올려주세요.');
-            return;
+            if (scoreA === 5) {
+                const tbA = match.tb_score_a || 0;
+                const tbB = match.tb_score_b || 0;
+                if (tbA === tbB) {
+                    alert('본선 5:5 동점입니다. 승패를 가르기 위해 타이브레이크 점수를 입력해주세요.');
+                    return;
+                }
+                newWinnerId = tbA > tbB ? match.team_a_id : match.team_b_id;
+            } else {
+                alert('본선 경기는 5:5 상황(타이브레이크)을 제외하고는 무승부가 없습니다.');
+                return;
+            }
         }
 
         if (scoreA > scoreB) newWinnerId = match.team_a_id;
@@ -116,10 +178,6 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches, courts }) => {
       }
     } else {
       updates.winner_id = null; // Reset winner if not completed
-      if ((newStatus === 'PENDING' || newStatus === 'SCHEDULED') && match.court_id) {
-          updates.court_id = null;
-          try { await updateCourt(parseInt(match.court_id), { match_id: null }); } catch (e) { console.error('Error freeing court:', e); }
-      }
     }
 
     await updateMatch(match.id, updates);
@@ -174,16 +232,30 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches, courts }) => {
     const sa = parseInt(editScoreA);
     const sb = parseInt(editScoreB);
     if (isNaN(sa) || isNaN(sb)) { alert('점수를 올바르게 입력해주세요.'); return; }
-    if (isKnockout && sa === sb) { alert('본선 경기는 동점이 없습니다. 승자를 명확히 입력해주세요.'); return; }
-
-    const prevWinnerId = match.winner_id;
-    const newWinnerId = sa > sb ? match.team_a_id : (sb > sa ? match.team_b_id : null);
+    
+    let newWinnerId = null;
+    if (isKnockout && sa === sb) {
+        if (sa === 5) {
+            const tbA = match.tb_score_a || 0;
+            const tbB = match.tb_score_b || 0;
+            if (tbA === tbB) {
+                alert('본선 5:5 상황입니다. 타이브레이크 점수를 입력하여 승자를 명확히 해주세요.');
+                return;
+            }
+            newWinnerId = tbA > tbB ? match.team_a_id : match.team_b_id;
+        } else {
+            alert('본선 경기는 5:5 상황(타이브레이크)을 제외하고 무승부가 없습니다. 승자를 명확히 입력해주세요.'); 
+            return;
+        }
+    } else {
+        newWinnerId = sa > sb ? match.team_a_id : (sb > sa ? match.team_b_id : null);
+    }
 
     if (!confirm(`[${teamA.name}] ${sa} : ${sb} [${teamB.name}]\n\n이 결과로 수정하시겠습니까?`)) return;
     setSaving(true);
     try {
       await updateMatch(match.id, { score_a: sa, score_b: sb, winner_id: newWinnerId });
-      if (allMatches && match.next_match_id && newWinnerId !== prevWinnerId) {
+      if (allMatches && match.next_match_id && newWinnerId !== winnerId) {
         const nextM = allMatches.find(m => m.id === match.next_match_id);
         if (nextM) {
           await updateMatch(nextM.id, {
@@ -233,7 +305,10 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches, courts }) => {
   return (
     <div className={`match-card ${isLive ? 'live' : ''} ${isCompleted ? 'completed' : ''}`}>
       <div className="card-header">
-        <span className="match-info">{match.group_id} - R{match.round}</span>
+        <span className="match-info">
+          {match.group_id} - R{match.round}
+          {match.court_id ? ` (Court ${match.court_id})` : ''}
+        </span>
         <div style={{ display: 'flex', gap: '5px' }}>
           {isLive && <span className="live-badge">● 진행중</span>}
           {isCompleted && <span className="completed-badge">✓ 종료</span>}
@@ -269,11 +344,35 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches, courts }) => {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          {isAdmin && teamA.id !== 'TBD' && teamA.id !== 'BYE' && <button onClick={() => handleScore('A', -1)} style={adminBtnStyle}>-</button>}
-          <div className="score" style={getScoreStyle(winnerId === teamA.id)}>
-            {teamA.id === 'TBD' || teamA.id === 'BYE' ? '-' : match.score_a}
-          </div>
-          {isAdmin && teamA.id !== 'TBD' && teamA.id !== 'BYE' && <button onClick={() => handleScore('A', 1)} style={adminBtnStyle}>+</button>}
+          {isAdmin && teamA.id !== 'TBD' && teamA.id !== 'BYE' ? (
+            <input 
+              type="number" 
+              min="0" max="6" 
+              value={match.score_a == null ? '' : match.score_a} 
+              onChange={(e) => handleScoreChange('A', e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key >= '7' || e.key === '-' || e.key === '+' || e.key === 'e' || e.key === '.') {
+                  e.preventDefault();
+                }
+              }}
+              style={{
+                width: '44px',
+                height: '34px',
+                textAlign: 'center',
+                background: 'rgba(0,0,0,0.4)',
+                color: 'var(--tennis-yellow)',
+                border: '1px solid #666',
+                borderRadius: '6px',
+                fontSize: '1.2rem',
+                fontWeight: '900',
+                outline: 'none'
+              }}
+            />
+          ) : (
+            <div className="score" style={getScoreStyle(winnerId === teamA.id)}>
+              {teamA.id === 'TBD' || teamA.id === 'BYE' ? '-' : match.score_a}
+            </div>
+          )}
         </div>
       </div>
 
@@ -296,11 +395,35 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches, courts }) => {
           </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          {isAdmin && teamB.id !== 'TBD' && teamB.id !== 'BYE' && <button onClick={() => handleScore('B', -1)} style={adminBtnStyle}>-</button>}
-          <div className="score" style={getScoreStyle(winnerId === teamB.id)}>
-            {teamB.id === 'TBD' || teamB.id === 'BYE' ? '-' : match.score_b}
-          </div>
-          {isAdmin && teamB.id !== 'TBD' && teamB.id !== 'BYE' && <button onClick={() => handleScore('B', 1)} style={adminBtnStyle}>+</button>}
+          {isAdmin && teamB.id !== 'TBD' && teamB.id !== 'BYE' ? (
+            <input 
+              type="number" 
+              min="0" max="6" 
+              value={match.score_b == null ? '' : match.score_b} 
+              onChange={(e) => handleScoreChange('B', e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key >= '7' || e.key === '-' || e.key === '+' || e.key === 'e' || e.key === '.') {
+                  e.preventDefault();
+                }
+              }}
+              style={{
+                width: '44px',
+                height: '34px',
+                textAlign: 'center',
+                background: 'rgba(0,0,0,0.4)',
+                color: 'var(--tennis-yellow)',
+                border: '1px solid #666',
+                borderRadius: '6px',
+                fontSize: '1.2rem',
+                fontWeight: '900',
+                outline: 'none'
+              }}
+            />
+          ) : (
+            <div className="score" style={getScoreStyle(winnerId === teamB.id)}>
+              {teamB.id === 'TBD' || teamB.id === 'BYE' ? '-' : match.score_b}
+            </div>
+          )}
         </div>
       </div>
 
@@ -363,34 +486,63 @@ const MatchCard = ({ match, teamA, teamB, isAdmin, allMatches, courts }) => {
         </div>
       )}
 
-      {/* Live Tiebreak Indicator: knockout match LIVE at 5:5 */}
-      {isLive && match.score_a === 5 && match.score_b === 5 &&
-        typeof match.group_id === 'string' && !/^\d+조$/.test(match.group_id) && (
-          <div className="tb-row tb-live">
-            <span className="tb-label">🎾 TB</span>
-            <span style={{ color: '#88ddff', fontSize: '0.88rem', fontWeight: '700' }}>타이브레이크 진행 중...</span>
-          </div>
-        )}
-
-      {/* Completed Tiebreak Result */}
-      {isCompleted && match.tb_score_a !== undefined && match.tb_score_a !== null &&
-        match.tb_score_b !== undefined && match.tb_score_b !== null && (
-          <div className="tb-row">
-            <span className="tb-label">🎾 TB</span>
-            <span className="tb-scores">
+      {/* Tiebreak Section */}
+      {isKnockout && match.score_a === 5 && match.score_b === 5 && (
+        <div className={`tb-row ${isLive ? 'tb-live' : ''}`}>
+          <span className="tb-label">🎾 TB</span>
+          
+          {isAdmin ? (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '5px', flex: 1 }}>
+              <input 
+                type="number" 
+                min="0"
+                value={match.tb_score_a == null ? '' : match.tb_score_a} 
+                onChange={(e) => handleTbScoreChange('A', e.target.value)}
+                style={{
+                  width: '40px', height: '28px', textAlign: 'center',
+                  background: 'rgba(0,0,0,0.6)', color: '#88ddff',
+                  border: '1px solid #446', borderRadius: '4px',
+                  fontSize: '1rem', fontWeight: '800', outline: 'none'
+                }}
+              />
+              <span style={{ color: '#555', margin: '0 2px' }}>:</span>
+              <input 
+                type="number" 
+                min="0"
+                value={match.tb_score_b == null ? '' : match.tb_score_b} 
+                onChange={(e) => handleTbScoreChange('B', e.target.value)}
+                style={{
+                  width: '40px', height: '28px', textAlign: 'center',
+                  background: 'rgba(0,0,0,0.6)', color: '#88ddff',
+                  border: '1px solid #446', borderRadius: '4px',
+                  fontSize: '1rem', fontWeight: '800', outline: 'none'
+                }}
+              />
+              {!isCompleted && <span style={{ color: '#88ddff', fontSize: '0.8rem', marginLeft: '5px' }}>7점 선점 입력</span>}
+              {isCompleted && (
+                <span className="tb-winner" style={{ marginLeft: 'auto' }}>
+                  {winnerId === match.team_a_id ? `${teamA.name} 승 🏆` : winnerId === match.team_b_id ? `${teamB.name} 승 🏆` : ''}
+                </span>
+              )}
+            </div>
+          ) : (
+             <span className="tb-scores" style={{ display: 'flex', flex: 1, alignItems: 'center' }}>
               <span style={{ color: winnerId === (match.team_a_id) ? 'var(--tennis-yellow)' : '#aaa', fontWeight: winnerId === match.team_a_id ? '800' : '400' }}>
-                {match.tb_score_a}
+                {match.tb_score_a != null ? match.tb_score_a : 0}
               </span>
               <span style={{ color: '#555', margin: '0 4px' }}>:</span>
               <span style={{ color: winnerId === (match.team_b_id) ? 'var(--tennis-yellow)' : '#aaa', fontWeight: winnerId === match.team_b_id ? '800' : '400' }}>
-                {match.tb_score_b}
+                {match.tb_score_b != null ? match.tb_score_b : 0}
               </span>
+              {isCompleted && (
+                <span className="tb-winner" style={{ marginLeft: 'auto' }}>
+                  {winnerId === match.team_a_id ? `${teamA.name} 승 🏆` : winnerId === match.team_b_id ? `${teamB.name} 승 🏆` : ''}
+                </span>
+              )}
             </span>
-            <span className="tb-winner">
-              {winnerId === match.team_a_id ? `${teamA.name} 승 🏆` : winnerId === match.team_b_id ? `${teamB.name} 승 🏆` : ''}
-            </span>
-          </div>
-        )}
+          )}
+        </div>
+      )}
 
       {/* ── 관리자 되돌리기 / 결과 수정 (COMPLETED 경기 전용) ── */}
       {isAdmin && isCompleted && (
